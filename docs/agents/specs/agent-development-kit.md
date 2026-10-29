@@ -1,7 +1,7 @@
 # Agent Development Kit: Design
 
 Date: 2026-10-29
-Status: draft, awaiting user approval
+Status: approved
 
 Markers used in this document:
 
@@ -136,7 +136,10 @@ All three tools support the open Agent Skills format (`SKILL.md` with `name` and
      - Single files, such as the rules file, use a symlink when allowed, otherwise a hard link.
      - If neither works, it copies the file and warns that updates need a re-run.
    - **Windows user-level paths:** `%USERPROFILE%\.claude`, `%USERPROFILE%\.copilot`, `%USERPROFILE%\.agents`.
-   - **Tests.** The install scripts must be tested on all three operating systems. How is left to the builder, for example a CI matrix.
+   - **Tests.** The install scripts must be tested on all three operating systems.
+   - **CI (our call).** GitHub Actions with an Ubuntu, macOS and Windows matrix. Forgejo Actions reads the same syntax but usually lacks macOS and Windows runners.
+   - **Prerequisite.** Python 3 (stdlib only) is required on macOS, Linux and Windows, for the guard hook and the JSON merge. This is a user decision.
+   - **Claude hook registration (our call).** A user-level Claude Code hook can only be registered in `~/.claude/settings.json`. The installer merges one marked guard entry there, writes `settings.json.adk-backup` before its first change, and uninstall removes only that entry. This is the one exception to "touches only the kit's own links".
 7. **Team distribution (later).** The repo also carries a Claude-format plugin marketplace manifest. Claude Code, Copilot CLI and VS Code can all install it. For the user's own machine, symlinks remain preferred because edits take effect immediately.
 
 ### Verify first (unverified, must be tested before relying on them)
@@ -287,7 +290,9 @@ Strict TDD is not required. Tests and code are developed in parallel and both ar
   - Opening pull requests.
   - Publishing to local development environments.
 - **Merge:** the agent merges each slice's PR itself. A project can override this in `AGENTS.md`.
-- **Strictly forbidden:** publishing to customer environments and deleting anything on them.
+- **Strictly forbidden:**
+  - Publishing to customer environments and deleting anything on them.
+  - Publishing to package registries (`cargo publish`, `npm publish`, AppSource submissions and similar). These are blocked exactly like customer environments: allowed only if the target is listed in `environments.md`, for example a local registry. This is a user decision.
 - **Environment allowlist (our call).** Each project lists its permitted publish targets in `environments.md`, for example a local Docker container or al-runner.
   - Any target that is not listed counts as a customer environment and is forbidden.
   - Reason: an agent cannot reliably tell a customer environment from its name.
@@ -333,6 +338,7 @@ These go in the kit's rules file and apply to every project.
 - weaken, skip or delete tests to make them pass
 - conceal failures or uncertainty
 - publish to or delete on customer environments
+- publish to package registries (crates.io, npm, PyPI, NuGet, AppSource and similar) unless the target is listed in `environments.md`
 
 **Principles:**
 
