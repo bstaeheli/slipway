@@ -1,9 +1,11 @@
 import json
+import os
 import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 ROOT = Path(__file__).resolve().parent.parent
 GUARD = ROOT / "hooks" / "guard.py"
@@ -107,6 +109,88 @@ class GuardTest(unittest.TestCase):
         self.assertDenied("ssh bcdev-cust.example", p)
         self.assertDenied("ssh xbcdev", p)
         self.assertAllowed("ssh bcdev", p)
+
+    def test_line_continuation_curl_denied(self):
+        self.assertDenied("curl https://x \\\n  -X DELETE", self.project())
+
+    def test_line_continuation_invoke_restmethod_denied(self):
+        self.assertDenied("Invoke-RestMethod -Uri https://x `\n  -Method Post", self.project())
+
+    def test_chain_with_unlisted_segment_denied(self):
+        p = self.project()
+        self.assertDenied("ssh bcdev && ssh custprod", p)
+        self.assertDenied("ssh bcdev; cargo publish", p)
+        self.assertDenied("ssh bcdev | ssh custprod", p)
+        self.assertAllowed("ssh bcdev && ls", p)
+
+    def test_ssh_tools_and_paths_allowed(self):
+        p = self.project()
+        self.assertAllowed("ssh-keygen -t ed25519", p)
+        self.assertAllowed("cat ~/.ssh/config", p)
+        self.assertAllowed("ssh-add ~/.ssh/id_ed25519", p)
+        self.assertDenied("ssh admin@host", p)
+        self.assertDenied("scp f admin@host:/tmp", p)
+
+    def test_home_dir_docs_agents_not_opt_in(self):
+        home = self.root / "home"
+        (home / "docs" / "agents").mkdir(parents=True)
+        work = home / "work" / "proj"
+        work.mkdir(parents=True)
+        with mock.patch.dict(os.environ, {"HOME": str(home), "USERPROFILE": str(home)}):
+            self.assertAllowed("ssh admin@customer.example", work)
+            self.assertAllowed("ssh admin@customer.example", home)
+
+    def test_curl_request_long_form_denied(self):
+        p = self.project()
+        self.assertDenied("curl --request DELETE https://x", p)
+        self.assertDenied("curl --request=POST https://x", p)
+
+    def test_curl_data_implicit_post_denied(self):
+        p = self.project()
+        for cmd in ("curl -d a=1 https://x", "curl https://x --data @f.json",
+                    "curl --data-raw '{}' https://x", "curl --data-binary @f https://x"):
+            self.assertDenied(cmd, p)
+        self.assertAllowed("curl -o out.json https://x", p)
+
+    def test_git_push_allowed(self):
+        self.assertAllowed("git push origin main", self.project())
+
+    def test_uppercase_command_denied(self):
+        self.assertDenied("CARGO PUBLISH", self.project())
+
+    def test_environments_bullet_variants(self):
+        env = """## Allowed targets
+
+* `bcdev` local container
+- group
+  - `staging-local` nested item
+### Registries
+* `localhost:4873` local registry
+
+## Other
+- `custprod`
+"""
+        p = self.project(environments=env)
+        self.assertEqual(guard.allowed_targets(p), ["bcdev", "staging-local", "localhost:4873"])
+        self.assertAllowed("ssh staging-local", p)
+        self.assertDenied("ssh custprod", p)
+
+    def test_undecodable_environments_denies(self):
+        p = self.project(environments=None)
+        (p / "docs" / "agents" / "constitution" / "environments.md").write_bytes(
+            b"## Allowed targets\n- `bcdev` \xff\xfe bad\n")
+        self.assertDenied("ssh x", p)
+        r = self.run_cli("claude", json.dumps(
+            {"tool_input": {"command": "ssh x"}, "cwd": str(p)}), cwd=str(self.root))
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("environments.md", r.stderr)
+
+    def test_non_utf8_stdin_is_malformed(self):
+        p = self.project()
+        r = subprocess.run([sys.executable, str(GUARD), "--tool", "claude"],
+                           input=b"\xff\xfe{}", capture_output=True, cwd=str(p))
+        self.assertEqual(r.returncode, 2)
+        self.assertIn(b"could not parse", r.stderr)
 
     def run_cli(self, tool, stdin, cwd=None):
         return subprocess.run(
