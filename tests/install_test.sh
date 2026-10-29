@@ -17,7 +17,7 @@ assert() { # assert <description> <command...>
 
 # Sets REPO and HOME (HOME may be overridden by caller via $1 subdir).
 setup() {
-	T=$(mktemp -d)
+	T=$(cd "$(mktemp -d)" && pwd -P)
 	REPO="$T/repo"
 	mkdir -p "$REPO/rules" "$REPO/skills/adk-a" "$REPO/skills/adk-b"
 	cp "$SRC/install.sh" "$REPO/"
@@ -67,25 +67,58 @@ test_creates_missing_dirs() {
 
 test_conflict_not_overwritten() {
 	setup
-	mkdir -p "$HOME/.claude/skills/adk-spec" "$HOME/.claude/skills/adk-a"
-	printf 'mine\n' >"$HOME/.claude/skills/adk-a/SKILL.md"
-	before=$(cat "$HOME/.claude/skills/adk-a/SKILL.md")
+	mkdir -p "$HOME/.claude/skills/adk-spec" "$HOME/.agents/skills/adk-a"
+	printf 'mine\n' >"$HOME/.agents/skills/adk-a/SKILL.md"
+	before=$(cat "$HOME/.agents/skills/adk-a/SKILL.md")
+	ln -s "$T/foreign" "$HOME/.claude/skills/adk-a"
 	rc=0
 	run || rc=$?
 	assert "exit 1" test "$rc" -eq 1
-	assert "conflict printed" grep -q "^conflict $HOME/.claude/skills/adk-a" "$T/out"
-	assert "content intact" test "$(cat "$HOME/.claude/skills/adk-a/SKILL.md")" = "$before"
-	assert "still real dir" test ! -L "$HOME/.claude/skills/adk-a"
+	assert "conflict printed for dir" grep -qx "conflict $HOME/.agents/skills/adk-a" "$T/out"
+	assert "content intact" test "$(cat "$HOME/.agents/skills/adk-a/SKILL.md")" = "$before"
+	assert "still real dir" test ! -L "$HOME/.agents/skills/adk-a"
+	assert "conflict printed for foreign link" grep -qx "conflict $HOME/.claude/skills/adk-a" "$T/out"
+	assert "foreign link kept" points_to "$HOME/.claude/skills/adk-a" "$T/foreign"
 	assert "others still linked" points_to "$HOME/.claude/skills/adk-b" "$REPO/skills/adk-b"
 }
 
 test_prune_stale_link() {
 	setup
+	mkdir -p "$HOME/.claude/skills" "$HOME/.agents/skills/foreign-dir" "$T/repo-other/skills/x"
+	ln -s "$REPO/skills/adk-gone" "$HOME/.claude/skills/adk-gone"
+	ln -s "$REPO/skills/adk-gone" "$HOME/.agents/skills/adk-gone"
+	ln -s /nonexistent-foreign "$HOME/.agents/skills/foreign-dangling"
+	ln -s "$T/repo-other/skills/x" "$HOME/.agents/skills/prefix-twin"
+	run
+	assert "removed printed" grep -qx "removed $HOME/.claude/skills/adk-gone" "$T/out"
+	assert "link gone" test ! -L "$HOME/.claude/skills/adk-gone"
+	assert "agents removed printed" grep -qx "removed $HOME/.agents/skills/adk-gone" "$T/out"
+	assert "agents link gone" test ! -L "$HOME/.agents/skills/adk-gone"
+	assert "foreign dir kept" test -d "$HOME/.agents/skills/foreign-dir"
+	assert "foreign dangling link kept" points_to "$HOME/.agents/skills/foreign-dangling" /nonexistent-foreign
+	assert "prefix-sharing link kept" points_to "$HOME/.agents/skills/prefix-twin" "$T/repo-other/skills/x"
+}
+
+test_prune_rm_failure() {
+	setup
 	mkdir -p "$HOME/.claude/skills"
 	ln -s "$REPO/skills/adk-gone" "$HOME/.claude/skills/adk-gone"
-	run
-	assert "removed printed" grep -q "^removed $HOME/.claude/skills/adk-gone" "$T/out"
-	assert "link gone" test ! -L "$HOME/.claude/skills/adk-gone"
+	chmod 555 "$HOME/.claude/skills"
+	rc=0
+	run || rc=$?
+	chmod 755 "$HOME/.claude/skills"
+	assert "rm failure exits nonzero" test "$rc" -ne 0
+	assert "no removed line on rm failure" test "$(grep -c '^removed ' "$T/out")" = 0
+	assert "link still there" test -L "$HOME/.claude/skills/adk-gone"
+}
+
+test_symlinked_repo_path() {
+	setup
+	ln -s "$REPO" "$T/repolink"
+	sh "$T/repolink/install.sh" >"$T/out" 2>&1
+	assert "link uses physical repo path" points_to "$HOME/.claude/skills/adk-a" "$REPO/skills/adk-a"
+	sh "$T/repolink/install.sh" uninstall >"$T/out" 2>&1
+	assert "uninstall via physical path" test ! -L "$HOME/.claude/skills/adk-a"
 }
 
 test_uninstall_keeps_foreign() {
@@ -157,13 +190,17 @@ test_copy_mode_keeps_frontmatter() {
 	assert "re-run recognizes copy" grep -qx "copied $f" "$T/out"
 	run uninstall
 	assert "uninstall removes copy" test ! -e "$f"
+	run --copy
+	{ seq 1 30; cat "$f"; } >"$T/shifted" && mv "$T/shifted" "$f"
+	run uninstall
+	assert "marker past line 20 still kit-owned" test ! -e "$f"
 	printf 'plain\n' >"$REPO/rules/adk.md"
 	run --copy
 	assert "no frontmatter: marker on line 1" test "$(head -n1 "$f")" = "<!-- adk-installed -->"
 }
 
 for t in test_install_links_all test_idempotent test_creates_missing_dirs test_conflict_not_overwritten \
-	test_prune_stale_link test_uninstall_keeps_foreign test_home_with_spaces \
+	test_prune_stale_link test_prune_rm_failure test_symlinked_repo_path test_uninstall_keeps_foreign test_home_with_spaces \
 	test_never_touches_claude_md test_copy_mode test_copy_mode_keeps_frontmatter; do
 	"$t"
 done

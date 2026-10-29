@@ -3,7 +3,7 @@
 # Usage: sh install.sh [install|uninstall|status] [--copy]
 set -eu
 
-REPO=$(cd "$(dirname "$0")" && pwd)
+REPO=$(cd "$(dirname "$0")" && pwd -P)
 MARK='<!-- adk-installed -->'
 CMD=install
 COPY=0
@@ -23,14 +23,14 @@ done
 say() { printf '%s %s\n' "$1" "$2"; }
 
 # kit_owned <target>: symlink into this repo, or a copy carrying the marker
-# (marker dir file, or marker line within the first 20 lines of a file).
+# (marker file in a dir, or marker line anywhere in a file).
 kit_owned() {
 	if [ -L "$1" ]; then
 		case $(readlink "$1") in "$REPO"/*) return 0 ;; esac
 		return 1
 	fi
 	if [ -d "$1" ]; then [ -f "$1/.adk-installed" ]; return; fi
-	[ -f "$1" ] && head -n 20 "$1" | grep -qxF "$MARK"
+	[ -f "$1" ] && grep -qxF "$MARK" "$1"
 }
 
 exists() { [ -e "$1" ] || [ -L "$1" ]; }
@@ -75,7 +75,7 @@ link_entry() {
 
 # remove_entry <target>: delete a kit-owned entry.
 remove_entry() {
-	rm -rf "$1"
+	rm -rf "$1" || return 1
 	say removed "$1"
 }
 
@@ -105,7 +105,9 @@ RULES="$HOME/.claude/rules/adk.md$NL$HOME/.copilot/instructions/adk.instructions
 
 case $CMD in
 install)
-	for d in $SKILL_DIRS; do [ -d "$d" ] && prune "$d"; done
+	for d in $SKILL_DIRS; do
+		if [ -d "$d" ]; then prune "$d"; fi
+	done
 	for s in "$REPO"/skills/*/; do
 		[ -d "$s" ] || continue
 		n=$(basename "$s")
@@ -114,7 +116,9 @@ install)
 	for r in $RULES; do link_entry "$REPO/rules/adk.md" "$r"; done
 	;;
 uninstall)
-	for d in $SKILL_DIRS; do [ -d "$d" ] && prune "$d"; done
+	for d in $SKILL_DIRS; do
+		if [ -d "$d" ]; then prune "$d"; fi
+	done
 	for r in $RULES; do
 		if exists "$r" && kit_owned "$r"; then remove_entry "$r"; fi
 	done
