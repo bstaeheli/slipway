@@ -368,6 +368,19 @@ class BuildSkillTest(unittest.TestCase):
         for w in ["last slice", "lessons.md", "delete the spec", "git"]:
             self.assertIn(w, self.low, w)
 
+    def test_human_merge_pending(self):
+        self.assertIn("- [ ] <slug>/S<n>: <title> (PR <link>, awaiting human merge)", self.text)
+        resume = self.low[self.low.find("resume"):self.low.find("first unchecked")]
+        self.assertIn("awaiting human merge", resume)
+        self.assertIn("mcp server", resume)
+        self.assertIn("prs awaiting merge", self.low)
+
+    def test_delete_requires_all_merged(self):
+        line = next(l for l in self.low.splitlines() if "delete the spec" in l)
+        self.assertIn("every slice", line)
+        self.assertIn("merged", line)
+        self.assertLess(line.find("merged"), line.find("delete the spec"))
+
     def test_tiers(self):
         for w in ["mid tier", "large tier", "small tier", "## Model and context economy",
                   "after a failure"]:
