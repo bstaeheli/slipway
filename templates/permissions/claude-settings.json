@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git switch:*)",
+      "Bash(git fetch:*)",
+      "Bash(al-runner:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo test:*)",
+      "Bash(cargo fmt:*)",
+      "Bash(cargo clippy:*)",
+      "Bash(npm test:*)",
+      "Bash(python3 -m unittest:*)"
+    ],
+    "deny": [
+      "PowerShell(Publish-PerTenantExtension:*)",
+      "PowerShell(Publish-BcContainerApp:*)",
+      "PowerShell(Publish-NAVApp:*)",
+      "PowerShell(Unpublish-NAVApp:*)",
+      "PowerShell(Unpublish-BcContainerApp:*)",
+      "Bash(cargo publish:*)",
+      "Bash(npm publish:*)",
+      "Bash(pnpm publish:*)",
+      "Bash(yarn publish:*)",
+      "Bash(twine upload:*)",
+      "Bash(dotnet nuget push:*)",
+      "Bash(docker push:*)"
+    ]
+  }
+}

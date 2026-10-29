@@ -1,9 +1,14 @@
+import json
 import re
+import sys
 import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 RULES = ROOT / "rules" / "adk.md"
+TEMPLATES = ROOT / "templates" / "permissions"
+sys.path.insert(0, str(ROOT / "hooks"))
+from guard import PUBLISH_OR_REMOTE_DELETE  # noqa: E402
 
 
 def section(path: str, heading: str) -> str:
@@ -65,6 +70,57 @@ class RulesTest(unittest.TestCase):
 
     def test_no_em_dash(self):
         self.assertNotIn("—", self.text)
+
+
+def rule_command(rule: str) -> str:
+    """`Bash(cargo publish:*)` -> `cargo publish`."""
+    m = re.fullmatch(r"(?:Bash|PowerShell)\((.+?)(?::\*)?\)", rule)
+    if not m:
+        raise AssertionError(f"unexpected rule shape {rule!r}")
+    return m.group(1)
+
+
+def publishes(command: str) -> bool:
+    return any(p.search(command) for p in PUBLISH_OR_REMOTE_DELETE)
+
+
+class PermissionTemplatesTest(unittest.TestCase):
+    def setUp(self):
+        perms = json.loads((TEMPLATES / "claude-settings.json").read_text(encoding="utf-8"))["permissions"]
+        self.allow, self.deny = perms["allow"], perms["deny"]
+        self.allow_cmds = {rule_command(r) for r in self.allow}
+        self.deny_cmds = {rule_command(r) for r in self.deny}
+
+    def test_claude_allow(self):
+        for r in ["Bash(git push:*)", "Bash(git commit:*)", "Bash(al-runner:*)", "Bash(cargo test:*)"]:
+            self.assertIn(r, self.allow)
+
+    def test_claude_deny(self):
+        for s in ["Publish-PerTenantExtension", "Unpublish-", "cargo publish", "npm publish"]:
+            self.assertTrue(any(s in r for r in self.deny), s)
+
+    def test_deny_is_publish_and_never_push(self):
+        for c in self.deny_cmds:
+            self.assertTrue(publishes(c), c)
+            self.assertNotIn("git push", c)
+
+    def test_no_allow_publishes(self):
+        for c in self.allow_cmds:
+            self.assertFalse(publishes(c), c)
+
+    def test_vscode_same_entries(self):
+        data = json.loads((TEMPLATES / "vscode-settings.json").read_text(encoding="utf-8"))
+        approve = data["chat.tools.terminal.autoApprove"]
+        self.assertEqual({k for k, v in approve.items() if v is True}, self.allow_cmds)
+        self.assertEqual({k for k, v in approve.items() if v is False}, self.deny_cmds)
+
+    def test_copilot_cli_flags(self):
+        text = (TEMPLATES / "copilot-cli.md").read_text(encoding="utf-8")
+        allow = set(re.findall(r"--allow-tool='shell\(([^)]+)\)'", text))
+        deny = set(re.findall(r"--deny-tool='shell\(([^)]+)\)'", text))
+        self.assertEqual(allow, self.allow_cmds)
+        self.assertEqual(deny, self.deny_cmds)
+        self.assertNotIn("—", text)
 
 
 if __name__ == "__main__":

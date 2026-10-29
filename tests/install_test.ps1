@@ -29,11 +29,12 @@ function Setup([string]$homeName = 'home') {
 	[void](New-Item -ItemType Directory -Path $t)
 	$script:T = Real $t
 	$script:Repo = P $script:T 'repo'
-	foreach ($d in 'rules', (P 'skills' 'adk-a'), (P 'skills' 'adk-b')) {
+	foreach ($d in 'rules', 'hooks', (P 'skills' 'adk-a'), (P 'skills' 'adk-b')) {
 		[void](New-Item -ItemType Directory -Force -Path (P $script:Repo $d))
 	}
 	Copy-Item -LiteralPath (P $Src 'install.ps1') -Destination $script:Repo
 	Copy-Item -LiteralPath (P $Src 'rules' 'adk.md') -Destination (P $script:Repo 'rules')
+	Copy-Item -LiteralPath (P $Src 'hooks' 'guard.py') -Destination (P $script:Repo 'hooks')
 	Set-Text (P $script:Repo 'skills' 'adk-a' 'SKILL.md') "a`n"
 	Set-Text (P $script:Repo 'skills' 'adk-b' 'SKILL.md') "b`n"
 	$script:H = P $script:T $homeName
@@ -184,6 +185,7 @@ function test_symlinked_repo_path {
 	New-DirLink $rl $Repo
 	Run-Script (P $rl 'install.ps1')
 	Check 'link uses physical repo path' (Points-To (P $H '.claude' 'skills' 'adk-a') (P $Repo 'skills' 'adk-a'))
+	Check 'hook uses physical repo path' ((Copilot-Hook).bash.EndsWith((Guard-Id 'copilot')))
 	Run-Script (P $rl 'install.ps1') uninstall
 	Check 'uninstall via physical path' (-not (Exists (P $H '.claude' 'skills' 'adk-a')))
 }
@@ -332,7 +334,9 @@ function test_status_output {
 		('ok ' + (P $H '.agents' 'skills' 'adk-a')),
 		('ok ' + (P $H '.claude' 'skills' 'adk-b')),
 		"conflict $rule",
-		('ok ' + (P $H '.copilot' 'instructions' 'adk.instructions.md')))
+		('ok ' + (P $H '.copilot' 'instructions' 'adk.instructions.md')),
+		('ok ' + (P $H '.copilot' 'hooks' 'adk-guard.json')),
+		('ok ' + (P $H '.claude' 'settings.json')))
 	Check 'status lines only for existing entries' (($Out -join "`n") -eq ($want -join "`n"))
 	Check 'status changes nothing' ((Get-Text $rule) -eq "mine`n")
 }
@@ -347,10 +351,160 @@ function test_zero_skills {
 	Check 'zero skills: no skill dirs' (-not (Exists (P $H '.claude' 'skills')) -and -not (Exists (P $H '.agents' 'skills')))
 }
 
+function Read-Json([string]$p) { [IO.File]::ReadAllText($p) | ConvertFrom-Json }
+function Canon($o) { ConvertTo-Json -InputObject $o -Depth 20 -Compress }
+function Settings-Path { P $H '.claude' 'settings.json' }
+function Copilot-Path { P $H '.copilot' 'hooks' 'adk-guard.json' }
+function Copilot-Hook { @((Read-Json (Copilot-Path)).hooks.preToolUse)[0] }
+# Guard path with forward slashes, quoted, plus the tool flag: the kit's command suffix.
+function Guard-Id([string]$tool) { '"' + ((P $Repo 'hooks' 'guard.py') -replace '\\', '/') + '" --tool ' + $tool }
+function Is-KitCmd([string]$c, [string]$tool) { $c.StartsWith('"') -and $c.EndsWith('" ' + (Guard-Id $tool)) }
+function Kit-Hooks {
+	@(@((Read-Json (Settings-Path)).hooks.PreToolUse) | ForEach-Object { @($_.hooks) } | Where-Object { $_.command -like ('*' + (Guard-Id 'claude')) })
+}
+function Write-Orig {
+	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude'))
+	Set-Text (Settings-Path) ($Orig + "`n")
+}
+$Orig = '{"model": "opus", "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "mine"}]}], "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "post"}]}]}, "env": {"A": "1"}}'
+
+function test_hooks_written {
+	Setup
+	Run
+	$f = Copilot-Path
+	$s = Settings-Path
+	Check 'copilot hook linked line' (Has-Line "linked $f")
+	$c = Read-Json $f
+	$h = Copilot-Hook
+	Check 'copilot hook version' ($c.version -eq 1)
+	Check 'copilot hook type' ($h.type -eq 'command' -and $h.timeoutSec -eq 10)
+	Check 'copilot hook bash command' (Is-KitCmd $h.bash 'copilot')
+	Check 'copilot hook powershell command' ($h.powershell -eq ('& ' + $h.bash))
+	Check 'settings linked line' (Has-Line "linked $s")
+	$d = Read-Json $s
+	$g = @($d.hooks.PreToolUse)
+	Check 'settings one group' ($g.Count -eq 1 -and $g[0].matcher -eq 'Bash|PowerShell')
+	Check 'settings one hook' (@($g[0].hooks).Count -eq 1 -and $g[0].hooks[0].type -eq 'command')
+	Check 'settings kit command' (Is-KitCmd $g[0].hooks[0].command 'claude')
+	Check 'no backup without prior settings' (-not (Exists "$s.adk-backup"))
+	Run uninstall
+	Check 'kit-created settings left empty' ((Canon (Read-Json $s)) -eq '{}')
+}
+
+function test_hook_commands_run {
+	Setup
+	$moved = P $T 'my repo'
+	[IO.Directory]::Move($Repo, $moved)
+	$script:Repo = $moved
+	Run
+	$proj = P $T 'proj'
+	[void](New-Item -ItemType Directory -Force -Path (P $proj 'docs' 'agents'))
+	$cwd = $proj -replace '\\', '/'
+	$deny = '{"cwd": "' + $cwd + '", "toolName": "bash", "toolArgs": {"command": "cargo publish"}, "tool_input": {"command": "cargo publish"}}'
+	$allow = '{"cwd": "' + $cwd + '", "tool_input": {"command": "echo hi"}}'
+	$ps = (Copilot-Hook).powershell
+	$out = Invoke-Expression ('$deny | ' + $ps)
+	Check 'copilot powershell hook denies publish' ((($out -join '') | ConvertFrom-Json).permissionDecision -eq 'deny')
+	if (-not $OnWindows) {
+		$c = @((Read-Json (Settings-Path)).hooks.PreToolUse)[0].hooks[0].command
+		[void]($deny | & sh -c $c 2>&1)
+		Check 'claude hook denies publish (exit 2)' ($LASTEXITCODE -eq 2)
+		[void]($allow | & sh -c $c 2>&1)
+		Check 'claude hook allows echo' ($LASTEXITCODE -eq 0)
+		$out = $deny | & sh -c (Copilot-Hook).bash
+		Check 'copilot bash hook denies publish' ((($out -join '') | ConvertFrom-Json).permissionDecision -eq 'deny')
+	}
+}
+
+function test_claude_settings_merged_once {
+	Setup
+	Write-Orig
+	Run
+	Run
+	$s = Settings-Path
+	Check 'second run ok line' (Has-Line "ok $s")
+	Check 'exactly one guard entry' ((Kit-Hooks).Count -eq 1)
+	$d = Read-Json $s
+	$o = $Orig | ConvertFrom-Json
+	Check 'key order kept' ((@($d.PSObject.Properties | ForEach-Object { $_.Name }) -join ',') -eq 'model,hooks,env')
+	Check 'user hook kept first' ((Canon @($d.hooks.PreToolUse)[0]) -eq (Canon @($o.hooks.PreToolUse)[0]))
+	Check 'other keys kept' ((Canon $d.model) -eq (Canon $o.model) -and (Canon $d.env) -eq (Canon $o.env) -and (Canon $d.hooks.PostToolUse) -eq (Canon $o.hooks.PostToolUse))
+	$k = @($d.hooks.PreToolUse)[1].hooks[0]
+	$k.command = '"/old/python3" ' + (Guard-Id 'claude')
+	Set-Text $s (ConvertTo-Json -InputObject $d -Depth 20)
+	Run
+	Check 'stale entry replaced line' (Has-Line "linked $s")
+	Check 'stale entry replaced, still one' ((Kit-Hooks).Count -eq 1)
+	Check 'stale entry now current' (-not ((Kit-Hooks)[0].command.StartsWith('"/old/')))
+}
+
+function test_backup_created {
+	Setup
+	$s = Settings-Path
+	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude'))
+	Set-Text $s "{`"model`": `"opus`"}`n"
+	Run
+	Check 'backup is original' ((Get-Text "$s.adk-backup") -eq "{`"model`": `"opus`"}`n")
+	Run uninstall
+	Set-Text $s "{`"model`": `"sonnet`"}`n"
+	Run
+	Check 'backup never overwritten' ((Get-Text "$s.adk-backup") -eq "{`"model`": `"opus`"}`n")
+}
+
+function test_uninstall_removes_only_guard_entry {
+	Setup
+	Write-Orig
+	$s = Settings-Path
+	$f = Copilot-Path
+	[void](New-Item -ItemType Directory -Force -Path (P $H '.copilot' 'hooks'))
+	$mine = P $H '.copilot' 'hooks' 'mine.json'
+	Set-Text $mine "{}`n"
+	Run
+	Run uninstall
+	Check 'settings removed line' (Has-Line "removed $s")
+	Check 'copilot hook removed line' (Has-Line "removed $f")
+	Check 'settings equal original' ((Canon (Read-Json $s)) -eq (Canon ($Orig | ConvertFrom-Json)))
+	Check 'copilot hook gone' (-not (Exists $f))
+	Check 'foreign copilot hook kept' (Exists $mine)
+	Run uninstall
+	Check 'second uninstall prints nothing' ($Out.Count -eq 0)
+}
+
+function test_invalid_settings_json {
+	Setup
+	$s = Settings-Path
+	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude'))
+	Set-Text $s "{not json`n"
+	Run
+	Check 'invalid json exit 1' ($Rc -eq 1)
+	Check 'invalid json conflict line' (Has-Line "conflict $s (invalid JSON)")
+	Check 'invalid json untouched' ((Get-Text $s) -eq "{not json`n")
+	Check 'invalid json no backup' (-not (Exists "$s.adk-backup"))
+	Check 'copilot hook still written' (Exists (Copilot-Path))
+	Check-Links
+}
+
+function test_missing_python {
+	Setup
+	$bin = P $T 'emptybin'
+	[void](New-Item -ItemType Directory -Path $bin)
+	$saved = $env:PATH
+	$env:PATH = $bin
+	Run
+	$env:PATH = $saved
+	Check 'no python exit 1' ($Rc -eq 1)
+	Check 'no python conflict line' (Has-Line 'conflict hooks (python 3 not found)')
+	Check 'no python: no copilot hook' (-not (Exists (Copilot-Path)))
+	Check 'no python: no settings' (-not (Exists (Settings-Path)))
+	Check-Links
+}
+
 foreach ($t in 'test_install_links_all', 'test_idempotent', 'test_creates_missing_dirs', 'test_conflict_not_overwritten',
 	'test_prune_stale_link', 'test_prune_rm_failure', 'test_symlinked_repo_path', 'test_uninstall_keeps_foreign',
 	'test_home_with_spaces', 'test_never_touches_claude_md', 'test_copy_mode', 'test_copy_mode_keeps_frontmatter',
-	'test_rules_file_fallback', 'test_rejects_extra_arguments', 'test_status_output', 'test_zero_skills') {
+	'test_rules_file_fallback', 'test_rejects_extra_arguments', 'test_status_output', 'test_zero_skills',
+	'test_hooks_written', 'test_hook_commands_run', 'test_claude_settings_merged_once', 'test_backup_created',
+	'test_uninstall_removes_only_guard_entry', 'test_invalid_settings_json', 'test_missing_python') {
 	& $t
 }
 

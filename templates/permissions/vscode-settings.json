@@ -1,0 +1,31 @@
+{
+  "chat.tools.terminal.autoApprove": {
+    "git status": true,
+    "git diff": true,
+    "git log": true,
+    "git add": true,
+    "git commit": true,
+    "git push": true,
+    "git switch": true,
+    "git fetch": true,
+    "al-runner": true,
+    "cargo build": true,
+    "cargo test": true,
+    "cargo fmt": true,
+    "cargo clippy": true,
+    "npm test": true,
+    "python3 -m unittest": true,
+    "Publish-PerTenantExtension": false,
+    "Publish-BcContainerApp": false,
+    "Publish-NAVApp": false,
+    "Unpublish-NAVApp": false,
+    "Unpublish-BcContainerApp": false,
+    "cargo publish": false,
+    "npm publish": false,
+    "pnpm publish": false,
+    "yarn publish": false,
+    "twine upload": false,
+    "dotnet nuget push": false,
+    "docker push": false
+  }
+}

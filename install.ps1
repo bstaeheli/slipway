@@ -1,4 +1,5 @@
-# Link (or copy) the kit's skills and rules file into user-level tool folders.
+# Link (or copy) the kit's skills and rules file into user-level tool folders and register
+# hooks/guard.py as a pre-tool hook for Claude Code (settings.json) and Copilot CLI.
 # Usage: install.ps1 [-Action install|uninstall|status] [-Copy] [-UserHome <path>]
 # Windows PowerShell 5.1 compatible. -NoSymlink is a test switch that simulates file symlink failure.
 # Only -Action is positional; anything else unknown or extra lands in $Rest and is rejected.
@@ -27,6 +28,8 @@ if (-not $UserHome) { $UserHome = $env:USERPROFILE }
 if (-not $UserHome) { $UserHome = $HOME }
 
 $OnWindows = $env:OS -eq 'Windows_NT'
+# Windows PowerShell 5.1 can serialize arrays as {"value":[...],"Count":n} without this.
+if ($PSVersionTable.PSVersion.Major -lt 6) { Remove-TypeData System.Array -ErrorAction SilentlyContinue }
 $Mark = '<!-- adk-installed -->'
 $script:Rc = 0
 
@@ -158,6 +161,99 @@ function Show-Status([string]$p) {
 	if (Test-KitOwned $p) { Say ok $p } else { Say conflict $p; $script:Rc = 1 }
 }
 
+# Absolute path of a Python 3 interpreter (forward slashes), or $null.
+function Find-Python {
+	foreach ($c in 'py -3', 'python3', 'python') {
+		$parts = $c -split ' '
+		if (-not (Get-Command $parts[0] -CommandType Application -ErrorAction SilentlyContinue)) { continue }
+		$rest = @($parts | Select-Object -Skip 1)
+		$out = & $parts[0] @rest -c 'import sys; assert sys.version_info[0] == 3; print(sys.executable)' 2>$null
+		if ($LASTEXITCODE -eq 0 -and $out) { return (@($out)[0].Trim() -replace '\\', '/') }
+	}
+	return $null
+}
+
+function Write-Utf8([string]$p, [string]$text) {
+	[void][IO.Directory]::CreateDirectory((Split-Path -Parent $p))
+	[IO.File]::WriteAllText($p, $text, (New-Object Text.UTF8Encoding $false))
+}
+
+function Set-Prop($o, [string]$name, $value) {
+	if ($o.PSObject.Properties[$name]) { $o.$name = $value } else { $o | Add-Member -NotePropertyName $name -NotePropertyValue $value }
+}
+function Is-Obj($o) { $o -is [Management.Automation.PSCustomObject] }
+
+# Kit's settings entry: a hook whose command contains the quoted guard path + --tool claude.
+function Test-KitHook($h) {
+	if (-not (Is-Obj $h)) { return $false }
+	$c = $h.PSObject.Properties['command']
+	return $c -and $c.Value -is [string] -and $c.Value.Contains($ClaudeId)
+}
+
+function Write-CopilotHook([string]$cmd) {
+	$hook = [pscustomobject]@{ type = 'command'; bash = $cmd; powershell = "& $cmd"; timeoutSec = 10 }
+	$text = (ConvertTo-Json -InputObject ([pscustomobject]@{ version = 1; hooks = [pscustomobject]@{ preToolUse = @($hook) } }) -Depth 5) + "`n"
+	if ((Test-Path -LiteralPath $CopilotHook -PathType Leaf) -and [IO.File]::ReadAllText($CopilotHook) -eq $text) { Say ok $CopilotHook; return }
+	Write-Utf8 $CopilotHook $text
+	Say linked $CopilotHook
+}
+
+# Merge, remove or report the kit's PreToolUse entry in ~/.claude/settings.json.
+function Set-ClaudeSettings([string]$act, [string]$cmd) {
+	$exists = Test-Path -LiteralPath $Settings -PathType Leaf
+	if (-not $exists -and $act -ne 'install') { return }
+	$data = '{}' | ConvertFrom-Json
+	if ($exists) {
+		try { $data = [IO.File]::ReadAllText($Settings) | ConvertFrom-Json -ErrorAction Stop } catch { $data = $null }
+		if (-not (Is-Obj $data)) { Say conflict "$Settings (invalid JSON)"; $script:Rc = 1; return }
+	}
+	$hooks = $null
+	$pre = @()
+	if ($data.PSObject.Properties['hooks']) {
+		$hooks = $data.hooks
+		if (-not (Is-Obj $hooks)) { $pre = $null }
+		elseif ($hooks.PSObject.Properties['PreToolUse']) {
+			$pre = $hooks.PreToolUse
+			if ($pre -isnot [array]) { $pre = $null }
+		}
+	}
+	if ($null -eq $pre) { Say conflict "$Settings (unexpected hooks structure)"; $script:Rc = 1; return }
+	$found = @()
+	$rest = New-Object Collections.ArrayList
+	foreach ($g in $pre) {
+		if ((Is-Obj $g) -and $g.PSObject.Properties['hooks'] -and $g.hooks -is [array]) {
+			$kit = @($g.hooks | Where-Object { Test-KitHook $_ })
+			if ($kit.Count -gt 0) {
+				$found += $kit
+				$g.hooks = @($g.hooks | Where-Object { -not (Test-KitHook $_) })
+				if ($g.hooks.Count -eq 0) { continue }
+			}
+		}
+		[void]$rest.Add($g)
+	}
+	if ($act -eq 'status') { if ($found.Count -gt 0) { Say ok $Settings }; return }
+	if ($act -eq 'install') {
+		if ($found.Count -eq 1 -and $found[0].command -eq $cmd) { Say ok $Settings; return }
+		[void]$rest.Add([pscustomobject]@{ matcher = 'Bash|PowerShell'; hooks = @([pscustomobject]@{ type = 'command'; command = $cmd }) })
+	} elseif ($found.Count -eq 0) { return }
+	if ($rest.Count -gt 0) {
+		if (-not $hooks) { $hooks = '{}' | ConvertFrom-Json; Set-Prop $data 'hooks' $hooks }
+		Set-Prop $hooks 'PreToolUse' $rest.ToArray()
+	} elseif ($hooks) {
+		$hooks.PSObject.Properties.Remove('PreToolUse')
+		if (@($hooks.PSObject.Properties).Count -eq 0) { $data.PSObject.Properties.Remove('hooks') }
+	}
+	$backup = "$Settings.adk-backup"
+	if ($exists -and -not (Test-Path -LiteralPath $backup)) { [IO.File]::Copy($Settings, $backup) }
+	Write-Utf8 $Settings ((ConvertTo-Json -InputObject $data -Depth 20) + "`n")
+	if ($act -eq 'install') { Say linked $Settings } else { Say removed $Settings }
+}
+
+$Guard = (P $Repo 'hooks' 'guard.py') -replace '\\', '/'
+$ClaudeId = "`"$Guard`" --tool claude"
+$Settings = P $UserHome '.claude' 'settings.json'
+$CopilotHook = P $UserHome '.copilot' 'hooks' 'adk-guard.json'
+
 $SkillDirs = @((P $UserHome '.claude' 'skills'), (P $UserHome '.agents' 'skills'))
 $Rules = @((P $UserHome '.claude' 'rules' 'adk.md'), (P $UserHome '.copilot' 'instructions' 'adk.instructions.md'))
 $Skills = @()
@@ -173,18 +269,30 @@ switch ($Action) {
 			foreach ($d in $SkillDirs) { Install-Entry (P $SkillsRoot $n) (P $d $n) }
 		}
 		foreach ($r in $Rules) { Install-Entry $RulesSrc $r }
+		$py = Find-Python
+		if ($py) {
+			Write-CopilotHook "`"$py`" `"$Guard`" --tool copilot"
+			Set-ClaudeSettings install "`"$py`" $ClaudeId"
+		} else {
+			Say conflict 'hooks (python 3 not found)'
+			$script:Rc = 1
+		}
 	}
 	'uninstall' {
 		foreach ($d in $SkillDirs) { Invoke-Prune $d }
 		foreach ($r in $Rules) {
 			if ((Get-Entry $r) -and (Test-KitOwned $r)) { Remove-Entry $r }
 		}
+		if (Get-Entry $CopilotHook) { Remove-Entry $CopilotHook }
+		Set-ClaudeSettings uninstall
 	}
 	'status' {
 		foreach ($n in $Skills) {
 			foreach ($d in $SkillDirs) { Show-Status (P $d $n) }
 		}
 		foreach ($r in $Rules) { Show-Status $r }
+		if (Get-Entry $CopilotHook) { Say ok $CopilotHook }
+		Set-ClaudeSettings status
 	}
 }
 
