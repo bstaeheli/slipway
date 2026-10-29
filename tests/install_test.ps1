@@ -266,23 +266,32 @@ function test_copy_mode_keeps_frontmatter {
 
 function test_rules_file_fallback {
 	Setup
-	$src = Get-Text (P $Repo 'rules' 'adk.md')
+	$srcFile = P $Repo 'rules' 'adk.md'
+	$src = Get-Text $srcFile
 	Run -NoSymlink
 	Check 'fallback exit 0' ($Rc -eq 0)
 	foreach ($f in (P $H '.claude' 'rules' 'adk.md'), (P $H '.copilot' 'instructions' 'adk.instructions.md')) {
-		Check "not a symlink $f" ((Test-Path -LiteralPath $f -PathType Leaf) -and -not (Is-Link $f))
-		$hard = (Get-Text $f) -eq $src
-		$copy = (@(Get-Content -LiteralPath $f) -contains $Mark) -and (Has-Line "copied $f (re-run install after updates)")
-		Check "hard link or copy with warning $f" ($hard -or $copy)
+		$lines = @(Get-Content -LiteralPath $f)
+		Check "real file $f" ((Test-Path -LiteralPath $f -PathType Leaf) -and -not (Is-Link $f))
+		Check "warning line $f" (Has-Line "copied $f (re-run install after updates)")
+		Check "frontmatter intact $f" (($lines[0] -eq '---') -and ($lines[1] -like 'applyTo:*'))
+		$close = -1
+		for ($i = 1; $i -lt $lines.Count; $i++) { if ($lines[$i] -eq '---') { $close = $i; break } }
+		Check "marker after frontmatter $f" ($close -gt 0 -and $lines[$close + 1] -eq $Mark)
+		Check "not a hard link $f" ((Get-Text $f) -ne $src)
 	}
 	Check 'skills still linked' (Points-To (P $H '.claude' 'skills' 'adk-a') (P $Repo 'skills' 'adk-a'))
+	$r = P $H '.claude' 'rules' 'adk.md'
+	Set-Text $srcFile ($src + "new rule`n")
 	Run -NoSymlink
 	Check 'fallback re-run exit 0' ($Rc -eq 0)
-	$r = P $H '.claude' 'rules' 'adk.md'
-	Check 'fallback re-run ok or recopied' ((Has-Line "ok $r") -or (Has-Line "copied $r (re-run install after updates)"))
+	Check 'fallback re-run warns again' (Has-Line "copied $r (re-run install after updates)")
+	Check 'fallback re-run refreshes' (@(Get-Content -LiteralPath $r) -contains 'new rule')
+	Check 'fallback re-run prints no removed line' (@($Out | Where-Object { $_ -like 'removed *' }).Count -eq 0)
 	Run uninstall
-	Check 'fallback uninstall removes rule' (-not (Exists (P $H '.claude' 'rules' 'adk.md')))
-	Check 'repo rule intact' ((Get-Text (P $Repo 'rules' 'adk.md')) -eq $src)
+	Check 'fallback uninstall removes claude rule' (-not (Exists $r))
+	Check 'fallback uninstall removes copilot rule' (-not (Exists (P $H '.copilot' 'instructions' 'adk.instructions.md')))
+	Check 'repo rule intact' ((Get-Text $srcFile) -eq ($src + "new rule`n"))
 }
 
 foreach ($t in 'test_install_links_all', 'test_idempotent', 'test_creates_missing_dirs', 'test_conflict_not_overwritten',

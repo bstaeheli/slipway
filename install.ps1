@@ -46,12 +46,7 @@ function Get-RealPath([string]$p) {
 $Repo = Get-RealPath $PSScriptRoot
 $RulesSrc = P $Repo 'rules' 'adk.md'
 
-function Same-Content([string]$a, [string]$b) {
-	[Convert]::ToBase64String([IO.File]::ReadAllBytes($a)) -eq [Convert]::ToBase64String([IO.File]::ReadAllBytes($b))
-}
-
-# Kit-owned: link into this repo, a copy carrying the marker (file in a dir, line in a file),
-# or a hard link (same content as the rules file).
+# Kit-owned: link into this repo, or a copy carrying the marker (file in a dir, line in a file).
 function Test-KitOwned([string]$p) {
 	$i = Get-Entry $p
 	if (-not $i) { return $false }
@@ -60,8 +55,7 @@ function Test-KitOwned([string]$p) {
 		return (Get-LinkTarget $i).StartsWith($Repo + $sep, [StringComparison]::OrdinalIgnoreCase)
 	}
 	if ($i.PSIsContainer) { return Test-Path -LiteralPath (P $p '.adk-installed') -PathType Leaf }
-	if (@([IO.File]::ReadAllLines($p)) -contains $Mark) { return $true }
-	return Same-Content $p $RulesSrc
+	return @([IO.File]::ReadAllLines($p)) -contains $Mark
 }
 
 # Delete one entry without following links; report failure through the exit code.
@@ -100,10 +94,7 @@ function Copy-WithMarker([string]$src, [string]$tgt) {
 function Install-Entry([string]$src, [string]$tgt) {
 	$isDir = Test-Path -LiteralPath $src -PathType Container
 	$i = Get-Entry $tgt
-	if (-not $Copy -and $i) {
-		if ((Is-Link $i) -and (Get-LinkTarget $i) -eq $src) { Say ok $tgt; return }
-		if (-not $isDir -and -not (Is-Link $i) -and -not $i.PSIsContainer -and (Same-Content $tgt $src)) { Say ok $tgt; return }
-	}
+	if (-not $Copy -and $i -and (Is-Link $i) -and (Get-LinkTarget $i) -eq $src) { Say ok $tgt; return }
 	if ($i) {
 		if (-not (Test-KitOwned $tgt)) { Say conflict $tgt; $script:Rc = 1; return }
 		Remove-Entry $tgt $false
@@ -127,15 +118,10 @@ function Install-Entry([string]$src, [string]$tgt) {
 		Say linked $tgt
 		return
 	}
-	# Files: symlink, else hard link, else a marked copy.
+	# Files: symlink, else a marked copy. No hard links: git replaces files on checkout, so they go stale.
 	try {
 		if ($NoSymlink) { throw 'symlink disabled' }
 		[void](New-Item -ItemType SymbolicLink -Path $tgt -Target $src -ErrorAction Stop)
-		Say linked $tgt
-		return
-	} catch {}
-	try {
-		[void](New-Item -ItemType HardLink -Path $tgt -Target $src -ErrorAction Stop)
 		Say linked $tgt
 		return
 	} catch {}
