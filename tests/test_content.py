@@ -7,6 +7,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 RULES = ROOT / "rules" / "adk.md"
 TEMPLATES = ROOT / "templates" / "permissions"
+BOOT = ROOT / "skills" / "adk-bootstrap"
 sys.path.insert(0, str(ROOT / "hooks"))
 from guard import PUBLISH_OR_REMOTE_DELETE  # noqa: E402
 
@@ -121,6 +122,61 @@ class PermissionTemplatesTest(unittest.TestCase):
         self.assertEqual(allow, self.allow_cmds)
         self.assertEqual(deny, self.deny_cmds)
         self.assertNotIn("—", text)
+
+
+TEMPLATE_FILES = ["AGENTS.md", "brief.md", "tech-stack.md", "invariants.md", "vocabulary.md",
+                  "environments.md", "status.md", "lessons.md", "roadmap.md", "personas.md"]
+
+
+class BootstrapTest(unittest.TestCase):
+    def setUp(self):
+        self.text = (BOOT / "SKILL.md").read_text(encoding="utf-8")
+
+    def tpl(self, name):
+        return (BOOT / "templates" / name).read_text(encoding="utf-8")
+
+    def test_description_and_flag(self):
+        desc = re.search(r"^description: (.+)$", self.text, re.M).group(1).lower()
+        self.assertIn("bootstrap", desc)
+        self.assertIn("opt", desc)
+        self.assertIn("disable-model-invocation: true", self.text)
+
+    def test_body_requirements(self):
+        low = self.text.lower()
+        self.assertIn("docs/agents/", self.text)
+        self.assertIn("existing", low)
+        self.assertRegex(low, r"confirm")
+        self.assertRegex(low, r"never create `?claude\.md")
+        self.assertRegex(low, r"never create `?roadmap")
+
+    def test_all_templates_exist(self):
+        for n in TEMPLATE_FILES:
+            self.assertTrue((BOOT / "templates" / n).is_file(), n)
+
+    def test_status_headings(self):
+        heads = re.findall(r"^## (.+)$", self.tpl("status.md"), re.M)
+        self.assertEqual(heads, ["Active", "Done", "Parked", "Blockers for the user"])
+
+    def test_environments_format(self):
+        t = self.tpl("environments.md")
+        self.assertIn("## Allowed targets", t)
+        listed = re.findall(r"^- `", section(str(BOOT / "templates" / "environments.md"), "Allowed targets"), re.M)
+        self.assertEqual(listed, [])
+
+    def test_agents_overrides(self):
+        t = self.tpl("AGENTS.md")
+        self.assertIn("docs/agents/", t)
+        self.assertIn("merge: agent|human", t)
+        self.assertIn("git-platform:", t)
+
+    def test_tech_stack_commands(self):
+        low = self.tpl("tech-stack.md").lower()
+        for w in ["build", "test", "publish"]:
+            self.assertIn(w, low)
+
+    def test_create_when(self):
+        for n in ["roadmap.md", "personas.md"]:
+            self.assertTrue(self.tpl(n).startswith("Create when"), n)
 
 
 if __name__ == "__main__":

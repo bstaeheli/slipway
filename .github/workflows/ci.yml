@@ -17,6 +17,8 @@ jobs:
         run: sh tests/install_test.sh
       - name: Python tests
         run: python3 -m unittest discover -s tests -v
+      - name: Skill lint
+        run: python3 tests/lint_skills.py
 
   windows:
     runs-on: windows-latest
@@ -30,3 +32,5 @@ jobs:
         run: pwsh -NoProfile -File tests/install_test.ps1; exit $LASTEXITCODE
       - name: Python tests
         run: python -m unittest discover -s tests -v
+      - name: Skill lint
+        run: python tests/lint_skills.py
