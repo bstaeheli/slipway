@@ -23,7 +23,7 @@ setup() {
 	REPO="$T/repo"
 	mkdir -p "$REPO/rules" "$REPO/hooks" "$REPO/skills/adk-a" "$REPO/skills/adk-b"
 	cp "$SRC/install.sh" "$REPO/"
-	cp "$SRC/hooks/guard.py" "$REPO/hooks/"
+	cp "$SRC/hooks/guard.py" "$SRC/hooks/install_hooks.py" "$REPO/hooks/"
 	cp "$SRC/rules/adk.md" "$REPO/rules/"
 	printf 'a\n' >"$REPO/skills/adk-a/SKILL.md"
 	printf 'b\n' >"$REPO/skills/adk-b/SKILL.md"
@@ -217,7 +217,7 @@ test_hooks_written() {
 	s="$HOME/.claude/settings.json"
 	assert "copilot hook linked line" grep -qx "linked $f" "$T/out"
 	# Expressions go through a variable: bash 3.2 mis-parses braces inside nested $(...).
-	want="d == {'version': 1, 'hooks': {'preToolUse': [{'type': 'command', 'bash': sys.argv[3], 'timeoutSec': 10}]}}"
+	want="d == {'version': 1, 'hooks': {'preToolUse': [{'type': 'command', 'bash': sys.argv[3], 'powershell': '& ' + sys.argv[3], 'timeoutSec': 10}]}}"
 	assert "copilot hook schema" test "$(jget "$f" "$want" "$(guard_cmd copilot)")" = True
 	assert "settings linked line" grep -qx "linked $s" "$T/out"
 	want="d == {'hooks': {'PreToolUse': [{'matcher': 'Bash|PowerShell', 'hooks': [{'type': 'command', 'command': sys.argv[3]}]}]}}"
@@ -335,11 +335,61 @@ test_status_hooks() {
 	assert "status settings" grep -qx "ok $HOME/.claude/settings.json" "$T/out"
 }
 
+test_settings_mode_kept() {
+	setup
+	s="$HOME/.claude/settings.json"
+	mkdir -p "$HOME/.claude"
+	printf '{"model": "opus"}\n' >"$s"
+	chmod 600 "$s"
+	run
+	assert "0600 kept after install" test -n "$(find "$s" -perm 600)"
+	run uninstall
+	assert "0600 kept after uninstall" test -n "$(find "$s" -perm 600)"
+}
+
+test_unexpected_hooks_structure() {
+	setup
+	s="$HOME/.claude/settings.json"
+	mkdir -p "$HOME/.claude"
+	printf '{"hooks": []}\n' >"$s"
+	rc=0
+	run || rc=$?
+	assert "structure exit 1" test "$rc" -eq 1
+	assert "structure conflict line" grep -qx "conflict $s (unexpected hooks structure)" "$T/out"
+	assert "structure untouched" test "$(cat "$s")" = '{"hooks": []}'
+	assert "structure no backup" test ! -e "$s.adk-backup"
+}
+
+test_bom_settings() {
+	setup
+	s="$HOME/.claude/settings.json"
+	mkdir -p "$HOME/.claude"
+	printf '\357\273\277{"model": "opus"}\n' >"$s"
+	rc=0
+	run || rc=$?
+	assert "bom exit 0" test "$rc" -eq 0
+	assert "bom merged" test "$(kit_count "$s")" = 1
+	assert "written without bom" test "$(head -c 1 "$s")" = "{"
+}
+
+test_status_stale_copilot_hook() {
+	setup
+	run
+	f="$HOME/.copilot/hooks/adk-guard.json"
+	printf '{}\n' >"$f"
+	rc=0
+	run status || rc=$?
+	assert "stale status exit 1" test "$rc" -eq 1
+	assert "stale status conflict line" grep -qx "conflict $f (stale, re-run install)" "$T/out"
+	assert "stale status changes nothing" test "$(cat "$f")" = "{}"
+}
+
 for t in test_install_links_all test_idempotent test_creates_missing_dirs test_conflict_not_overwritten \
 	test_prune_stale_link test_prune_rm_failure test_symlinked_repo_path test_uninstall_keeps_foreign test_home_with_spaces \
 	test_never_touches_claude_md test_copy_mode test_copy_mode_keeps_frontmatter test_hooks_written test_hook_commands_run \
 	test_claude_settings_merged_once test_backup_created test_uninstall_removes_only_guard_entry test_invalid_settings_json \
-	test_missing_python test_status_hooks; do
+	test_missing_python test_status_hooks test_settings_mode_kept test_unexpected_hooks_structure test_bom_settings \
+	test_status_stale_copilot_hook; do
 	"$t"
 done
 

@@ -23,6 +23,11 @@ was removed afterwards. VS Code and Windows were not available, so those items a
 
 ## Manual checklists
 
+V6 follow-up (Windows, Copilot CLI):
+1. Run `install.ps1`; in `copilot` ask to run `cargo publish` inside a project with `docs/agents/` and no allowed targets.
+
+Expected (V6 Windows): the command is denied through the hook's `powershell` key (`& "<python>" "<repo>/hooks/guard.py" --tool copilot`). Only the `bash` key was verified (macOS); the `powershell` key is unverified on Windows.
+
 V2/V3 (VS Code, macOS or Windows):
 1. Link `adk-probe` into `~/.claude/skills/` only; open Copilot Chat, type `/`, note whether `adk-probe` is listed. Repeat with `~/.agents/skills/` only.
 2. Link into both; count the `adk-probe` entries in the `/` menu (one = V3 no, two = V3 yes).

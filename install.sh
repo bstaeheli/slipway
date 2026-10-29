@@ -97,99 +97,23 @@ status_entry() {
 	if kit_owned "$1"; then say ok "$1"; else say conflict "$1"; CONFLICT=1; fi
 }
 
-# Hook registration, run by python3: argv = action settings claude_cmd copilot_file copilot_cmd.
-# The kit's settings entry is any hook whose command contains the quoted guard path + --tool claude.
-HOOKS_PY='
-import json, os, shutil, sys
-act, path, cmd, cfile, ccmd = sys.argv[1:]
-ident = cmd[cmd.index("\" \"") + 2:]
-
-def say(word, p, extra=""):
-    print(word, p + extra)
-
-def write(p, text):
-    real = os.path.realpath(p)
-    os.makedirs(os.path.dirname(real), exist_ok=True)
-    with open(real + ".adk-tmp", "w", encoding="utf-8") as f:
-        f.write(text)
-    os.replace(real + ".adk-tmp", real)
-
-if act == "install":
-    hook = {"version": 1, "hooks": {"preToolUse": [{"type": "command", "bash": ccmd, "timeoutSec": 10}]}}
-    text = json.dumps(hook, indent=2) + "\n"
-    try:
-        same = open(cfile, encoding="utf-8").read() == text
-    except OSError:
-        same = False
-    if not same:
-        write(cfile, text)
-    say("ok" if same else "linked", cfile)
-
-data = {}
-if os.path.exists(path):
-    try:
-        with open(path, encoding="utf-8") as f:
-            data = json.load(f)
-    except ValueError:
-        say("conflict", path, " (invalid JSON)")
-        sys.exit(1)
-hooks = data.get("hooks", {}) if isinstance(data, dict) else None
-pre = hooks.get("PreToolUse", []) if isinstance(hooks, dict) else None
-if not isinstance(pre, list):
-    say("conflict", path, " (unexpected hooks structure)")
-    sys.exit(1)
-
-def kit(h):
-    return isinstance(h, dict) and isinstance(h.get("command"), str) and ident in h["command"]
-
-found, rest = [], []
-for g in pre:
-    if isinstance(g, dict) and isinstance(g.get("hooks"), list) and any(kit(h) for h in g["hooks"]):
-        found += [h for h in g["hooks"] if kit(h)]
-        g["hooks"] = [h for h in g["hooks"] if not kit(h)]
-        if not g["hooks"]:
-            continue
-    rest.append(g)
-
-if act == "status":
-    if found:
-        say("ok", path)
-    sys.exit(0)
-if act == "install":
-    if len(found) == 1 and found[0]["command"] == cmd:
-        say("ok", path)
-        sys.exit(0)
-    rest.append({"matcher": "Bash|PowerShell", "hooks": [{"type": "command", "command": cmd}]})
-elif not found:
-    sys.exit(0)
-if rest:
-    data.setdefault("hooks", {})["PreToolUse"] = rest
-elif "hooks" in data:
-    hooks.pop("PreToolUse", None)
-    if not hooks:
-        del data["hooks"]
-if os.path.exists(path) and not os.path.exists(path + ".adk-backup"):
-    shutil.copy2(path, path + ".adk-backup")
-write(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")
-say("linked" if act == "install" else "removed", path)
-'
 GUARD="$REPO/hooks/guard.py"
 SETTINGS="$HOME/.claude/settings.json"
 COPILOT_HOOK="$HOME/.copilot/hooks/adk-guard.json"
 PY=$(command -v python3 || :)
 
-# hooks <install|uninstall|status>: register, remove or report the guard hooks.
+# hooks <install|uninstall|status>: register, remove or report the guard hooks (hooks/install_hooks.py).
+# Python is needed for install, otherwise only when there is a hook file to inspect.
 hooks() {
 	if [ "$1" = uninstall ] && [ -f "$COPILOT_HOOK" ]; then remove_entry "$COPILOT_HOOK" || CONFLICT=1; fi
-	if [ "$1" = status ] && [ -f "$COPILOT_HOOK" ]; then say ok "$COPILOT_HOOK"; fi
-	if [ "$1" != install ] && [ ! -f "$SETTINGS" ]; then return 0; fi
+	if [ "$1" = uninstall ] && [ ! -f "$SETTINGS" ]; then return 0; fi
+	if [ "$1" = status ] && [ ! -f "$SETTINGS" ] && [ ! -f "$COPILOT_HOOK" ]; then return 0; fi
 	if [ -z "$PY" ]; then
 		say conflict "hooks (python 3 not found)"
 		CONFLICT=1
 		return 0
 	fi
-	"$PY" -c "$HOOKS_PY" "$1" "$SETTINGS" "\"$PY\" \"$GUARD\" --tool claude" \
-		"$COPILOT_HOOK" "\"$PY\" \"$GUARD\" --tool copilot" || CONFLICT=1
+	"$PY" "$REPO/hooks/install_hooks.py" "$1" "$SETTINGS" "$COPILOT_HOOK" "$PY" "$GUARD" || CONFLICT=1
 }
 
 # Newline-separated lists so paths with spaces survive word splitting.

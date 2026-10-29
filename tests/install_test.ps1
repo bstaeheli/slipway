@@ -35,6 +35,7 @@ function Setup([string]$homeName = 'home') {
 	Copy-Item -LiteralPath (P $Src 'install.ps1') -Destination $script:Repo
 	Copy-Item -LiteralPath (P $Src 'rules' 'adk.md') -Destination (P $script:Repo 'rules')
 	Copy-Item -LiteralPath (P $Src 'hooks' 'guard.py') -Destination (P $script:Repo 'hooks')
+	Copy-Item -LiteralPath (P $Src 'hooks' 'install_hooks.py') -Destination (P $script:Repo 'hooks')
 	Set-Text (P $script:Repo 'skills' 'adk-a' 'SKILL.md') "a`n"
 	Set-Text (P $script:Repo 'skills' 'adk-b' 'SKILL.md') "b`n"
 	$script:H = P $script:T $homeName
@@ -499,12 +500,55 @@ function test_missing_python {
 	Check-Links
 }
 
+function test_values_untouched {
+	Setup
+	$s = Settings-Path
+	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude'))
+	$offset = '"2026-01-02T03:04:05.1234567+02:00"'
+	$zulu = '"2026-01-02T03:04:05.100Z"'
+	$deep = ('{"d": ' * 25) + '{"leaf": "deep"}' + ('}' * 25)
+	Set-Text $s ('{"a": ' + $offset + ', "b": ' + $zulu + ', "n": ' + $deep + '}')
+	foreach ($act in 'install', 'uninstall') {
+		Run $act
+		$text = Get-Text $s
+		Check "$act exit 0" ($Rc -eq 0)
+		Check "$act keeps offset date" ($text.Contains('"a": ' + $offset))
+		Check "$act keeps Z date" ($text.Contains('"b": ' + $zulu))
+		Check "$act keeps deep nesting" (([regex]::Matches($text, '"d": \{')).Count -eq 25 -and $text.Contains('"leaf": "deep"'))
+	}
+	Check 'uninstall removes hooks key' (-not (Get-Text $s).Contains('"hooks"'))
+}
+
+function test_unexpected_hooks_structure {
+	Setup
+	$s = Settings-Path
+	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude'))
+	Set-Text $s "{`"hooks`": []}`n"
+	Run
+	Check 'structure exit 1' ($Rc -eq 1)
+	Check 'structure conflict line' (Has-Line "conflict $s (unexpected hooks structure)")
+	Check 'structure untouched' ((Get-Text $s) -eq "{`"hooks`": []}`n")
+	Check 'structure no backup' (-not (Exists "$s.adk-backup"))
+}
+
+function test_status_stale_copilot_hook {
+	Setup
+	Run
+	$f = Copilot-Path
+	Set-Text $f "{}`n"
+	Run status
+	Check 'stale status exit 1' ($Rc -eq 1)
+	Check 'stale status conflict line' (Has-Line "conflict $f (stale, re-run install)")
+	Check 'stale status changes nothing' ((Get-Text $f) -eq "{}`n")
+}
+
 foreach ($t in 'test_install_links_all', 'test_idempotent', 'test_creates_missing_dirs', 'test_conflict_not_overwritten',
 	'test_prune_stale_link', 'test_prune_rm_failure', 'test_symlinked_repo_path', 'test_uninstall_keeps_foreign',
 	'test_home_with_spaces', 'test_never_touches_claude_md', 'test_copy_mode', 'test_copy_mode_keeps_frontmatter',
 	'test_rules_file_fallback', 'test_rejects_extra_arguments', 'test_status_output', 'test_zero_skills',
 	'test_hooks_written', 'test_hook_commands_run', 'test_claude_settings_merged_once', 'test_backup_created',
-	'test_uninstall_removes_only_guard_entry', 'test_invalid_settings_json', 'test_missing_python') {
+	'test_uninstall_removes_only_guard_entry', 'test_invalid_settings_json', 'test_missing_python', 'test_values_untouched',
+	'test_unexpected_hooks_structure', 'test_status_stale_copilot_hook') {
 	& $t
 }
 
