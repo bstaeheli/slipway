@@ -303,6 +303,13 @@ class SpecSkillTest(unittest.TestCase):
                   "## Model and context economy", "## Stopping and blockers"]:
             self.assertIn(w.lower(), self.low, w)
 
+    def test_assumptions_surfaced(self):
+        lines = [l for l in self.low.splitlines() if "assum" in l]
+        self.assertTrue(any("## blockers for the user" in l for l in lines))
+        self.assertTrue(any('"assumed"' in l for l in lines))
+        self.assertTrue(any("park" in l and "## parked" in l for l in lines))
+        self.assertTrue(any("summary" in l for l in lines))
+
     def test_not_restating_rules(self):
         items = [l[2:].strip() for h in ["Stopping and blockers", "Model and context economy"]
                  for l in section(str(RULES), h).splitlines() if l.startswith("- ")]

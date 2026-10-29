@@ -13,7 +13,7 @@ Follow `rules/adk.md` by heading. Run producing and reviewing on the large tier 
 2. **Spec.** Write `docs/agents/specs/<slug>.md` from `templates/spec.md`. Fill `## Intent`, `## Must`, `## Must not`, `## Acceptance`. State intent and outcomes only; never how it is built, layout or wording. Anything unsaid is the implementer's call.
 3. **Design.** Fill `## Design`: `### Context` (relevant knowledge), `### Graph` (affected code structure), `### Acceptance checks` (concrete checks for each acceptance item).
 4. **Plan.** Draft the execution plan in the session. It is transient: the plan is never written to the repo.
-5. **Slicing.** Fill `## Slices` in order with ids `S1`, `S2`, ... Each slice is small, independently runnable and testable. Add one line per slice under `## Active` in `docs/agents/status.md`: `- [ ] <slug>/S<n>: <title>`.
+5. **Slicing.** Fill `## Slices` in order with ids `S1`, `S2`, ... Each slice is small, independently runnable and testable. Add one line per slice under `## Active` in `docs/agents/status.md`: `- [ ] <slug>/S<n>: <title>`. Slices that depend on an assumption go under `## Parked` instead (see below).
 6. Hand off to `adk-build`.
 
 ## Review loop
@@ -27,5 +27,6 @@ Run one after each of spec, design, plan and slicing, before moving on.
 
 ## Questions and summary
 
-- A spec question only the user can answer goes under `## Blockers for the user` in `docs/agents/status.md`. Assume the most conservative reading, note it, and continue.
-- Give the user a summary of a few lines, not the spec: intent, the slice list, open questions.
+- A spec question only the user can answer goes under `## Blockers for the user` in `docs/agents/status.md`, together with the assumption you make: the most conservative reading. Also write the assumption into the spec under `## Must` or `## Intent`, marked "assumed".
+- Park every slice whose behavior depends on an assumption: list it under `## Parked`, not `## Active`, naming the assumption. Slices that do not depend on it proceed.
+- Give the user a summary of a few lines, not the spec: intent, the slice list, open questions, and every assumption.
