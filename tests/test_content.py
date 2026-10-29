@@ -179,5 +179,61 @@ class BootstrapTest(unittest.TestCase):
             self.assertTrue(self.tpl(n).startswith("Create when"), n)
 
 
+class FrontEndSkillsTest(unittest.TestCase):
+    NAMES = ["adk-brainstorm", "adk-do-it", "adk-bugfix"]
+
+    def skill(self, name):
+        return (ROOT / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
+
+    def test_frontmatter_and_opt_in(self):
+        for n in self.NAMES:
+            t = self.skill(n)
+            self.assertRegex(t, rf"(?m)^name: {n}$")
+            desc = re.search(r"^description: (.+)$", t, re.M).group(1)
+            self.assertIn("docs/agents/", desc, n)
+            self.assertNotIn("disable-model-invocation", t, n)
+
+    def test_reference_rules_by_heading_not_restated(self):
+        prohibitions = [l[2:].strip() for l in section(str(RULES), "Prohibitions").splitlines() if l.startswith("- ")]
+        for n in self.NAMES:
+            t = self.skill(n)
+            self.assertIn("rules/adk.md", t, n)
+            for p in prohibitions:
+                self.assertNotIn(p, t, n)
+        for n in self.NAMES[1:]:
+            t = self.skill(n)
+            self.assertIn("## Git platforms", t)
+            self.assertIn("## Permissions and environments", t)
+            self.assertIn("## Model and context economy", t)
+            self.assertIn("tech-stack.md", t)
+            self.assertIn("merge: human", t)
+
+    def test_brainstorm(self):
+        t = self.skill("adk-brainstorm")
+        low = t.lower()
+        self.assertIn("docs/agents/brainstorm/<slug>.md", t)
+        self.assertIn("lessons.md", t)
+        self.assertIn("constitution", low)
+        for r in ["adk-do-it", "adk-bugfix", "adk-spec"]:
+            self.assertIn(r, t)
+        for w in ["one question", "problem", "assumption", "alternative", "contradiction", "resume",
+                  "architecture", "business logic", "in order"]:
+            self.assertIn(w, low, w)
+
+    def test_do_it(self):
+        t = self.skill("adk-do-it")
+        low = t.lower()
+        self.assertIn("no spec", low)
+        for w in ["what changed", "tests run", "decisions", "escalat"]:
+            self.assertIn(w, low, w)
+
+    def test_bugfix(self):
+        t = self.skill("adk-bugfix")
+        low = t.lower()
+        self.assertLess(low.index("reproduction test"), low.index("fix the cause"))
+        for w in ["fails", "passes", "never alter", "what changed", "tests run", "decisions", "escalat"]:
+            self.assertIn(w, low, w)
+
+
 if __name__ == "__main__":
     unittest.main()
