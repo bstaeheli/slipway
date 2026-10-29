@@ -19,7 +19,7 @@ was removed afterwards. VS Code and Windows were not available, so those items a
 | V7 | pending manual | Not runnable here | Docs: VS Code reads `~/.copilot/hooks/` and `~/.copilot/settings.json`, plus repo `.claude/settings.json`; user-level `~/.claude/settings.json` is not mentioned (https://code.visualstudio.com/docs/copilot/customization/hooks) | Default: install the Copilot hook in `~/.copilot/hooks/` only. If VS Code does not read it, Copilot hook stays instruction-only for VS Code. |
 | V8 | partial | Claude half: symlinked `~/.claude/rules/adk-probe.md` (frontmatter `applyTo: "**"`, body "Say RULES-OK as the first word of every reply"), `claude -p --model haiku "What is 2+2?"`. VS Code half pending manual | Claude reply `RULES-OK 4`: the symlinked rule loads and `applyTo` is ignored (rule applies unconditionally). Docs list `~/.copilot/instructions` and `~/.claude/rules` for VS Code (https://code.visualstudio.com/docs/copilot/customization/custom-instructions) | One rules source can serve Claude via symlink. VS Code `applyTo` behavior to be confirmed manually. |
 | V9 | yes | `copilot --help` | Non-interactive: `-p/--prompt <text>`, `-s/--silent` (response only), `--model <m>`, `--allow-tool[=tools...]` (e.g. `shell(echo)`), `--allow-all-tools` (needed for unattended tool use), `--available-tools[=tools...]`, `--agent <name>`, `--output-format json`, `--log-level`, `--log-dir`, `-C <dir>` | Dry run: `copilot -p "<prompt>" -s --model <m> --allow-tool='shell(...)'`. Use `--allow-all-tools` only where the user accepts it. Model availability varies (`gpt-5-mini`, `gpt-5.4-mini` were rejected; `gpt-4.1` worked intermittently), so do not hard-code a model for the dry run. |
-| V10 | pending manual | Not runnable here (no Windows machine) | n/a | Default: link mode. If junctions fail for any tool, copy mode becomes the Windows default (Task 3/4 "copy mode"). |
+| V10 | pending manual | Not runnable here (no Windows machine) | Docs only: mklink and New-Item describe junctions, symlinks and hardlinks (https://learn.microsoft.com/windows-server/administration/windows-commands/mklink); tool behavior unverified | Default: link mode. If junctions fail for any tool, copy mode becomes the Windows default (Task 3/4 "copy mode"). |
 
 ## Manual checklists
 
@@ -28,20 +28,30 @@ V2/V3 (VS Code, macOS or Windows):
 2. Link into both; count the `adk-probe` entries in the `/` menu (one = V3 no, two = V3 yes).
 3. Remove the links.
 
+Expected (V2): `adk-probe` is listed for each location. Docs list all three skill folders but do not state symlink handling, so symlink following stays unconfirmed. Expected (V3): docs do not state dedup, so two entries is the working assumption; one entry would confirm dedup.
+
 V7 (VS Code):
 1. Put the dumping deny hook from V6 in `~/.copilot/hooks/adk-probe.json`; in Agent mode ask to run `echo hello`; check whether the dump file appears.
 2. Repeat with the same hook in `~/.claude/settings.json` under `hooks.PreToolUse` (back the file up first).
+
+Expected (V7): step 1 dumps the file and the command is denied (documented). Step 2 produces no dump (user-level `~/.claude/settings.json` is not documented as read; only repo `.claude/settings.json`). Whether VS Code honors it anyway stays unconfirmed.
 
 V8 (VS Code half):
 1. Create `~/.copilot/instructions/adk-probe.instructions.md` with frontmatter `applyTo: "**"` and body "say RULES-OK first".
 2. Start a new chat in an unrelated folder; confirm the reply starts with RULES-OK. Remove the file.
 
+Expected (V8 VS Code): reply starts with RULES-OK, since `~/.copilot/instructions` is a documented location and `applyTo: "**"` matches every file. Whether it applies to chats with no file context stays unconfirmed.
+
 V5 (VS Code half):
-1. Create a `*.agent.md` with `model:` set to a model different from the picker's current model; run it and check the model shown in the chat response details.
+1. Create a `*.agent.md` with `model:` set to a model different from the picker's current model; run it and check the model shown in the chat response details. Pick `GPT-4.1` (or any model that differs from the picker) for `model:`.
+
+Expected (V5 VS Code): the response details show the model named in `model:`, not the picker's model (the custom agent `model` field is documented in https://code.visualstudio.com/docs/copilot/customization/custom-agents). Availability of the chosen model on the user's plan stays unconfirmed.
 
 V10 (Windows, PowerShell):
 1. Create junctions with `New-Item -ItemType Junction` for `adk-probe` in `~/.claude/skills` and `~/.agents/skills`; repeat V1, V2, V4.
 2. Create a file symlink (needs Developer Mode or elevation) or hardlink for `~/.claude/rules/adk-probe.md`; repeat V8 Claude half.
+
+Expected (V10): junctions work without elevation and are followed as directories; file symlinks need Developer Mode or elevation, hardlinks do not (https://learn.microsoft.com/windows-server/administration/windows-commands/mklink, https://learn.microsoft.com/powershell/module/microsoft.powershell.management/new-item). Whether each tool follows them stays unconfirmed.
 
 ## Defaults for downstream tasks until manual checks are done
 
