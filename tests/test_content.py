@@ -317,5 +317,72 @@ class SpecSkillTest(unittest.TestCase):
             self.assertNotIn(p, self.text)
 
 
+BUILD = ROOT / "skills" / "adk-build" / "SKILL.md"
+
+
+class BuildSkillTest(unittest.TestCase):
+    def setUp(self):
+        self.text = BUILD.read_text(encoding="utf-8")
+        self.low = self.text.lower()
+
+    def test_frontmatter(self):
+        self.assertRegex(self.text, r"(?m)^name: adk-build$")
+        desc = re.search(r"^description: (.+)$", self.text, re.M).group(1)
+        self.assertIn("docs/agents/", desc)
+        self.assertNotIn("disable-model-invocation", self.text)
+
+    def test_items_in_order(self):
+        # One distinguishing phrase per brief item, 1 to 12, in order.
+        phrases = ["first unchecked", "fresh subagent", "skeleton", "not read the implementation",
+                   "tech-stack.md", "code, test or spec", "3 attempts", "code vs spec",
+                   "merge: human", "postmortem", "small tier", '"continue"']
+        idx = [self.low.find(p) for p in phrases]
+        for p, i in zip(phrases, idx):
+            self.assertGreaterEqual(i, 0, p)
+        self.assertEqual(idx, sorted(idx))
+
+    def test_resume_and_blockers(self):
+        for w in ["docs/agents/status.md", "## Parked", "## Blockers for the user", "batch"]:
+            self.assertIn(w.lower(), self.low, w)
+
+    def test_lanes(self):
+        for w in ["contracts", "signatures", "data shapes", "error cases", "code lane", "test lane",
+                  "## acceptance", "### acceptance checks", "sequential", "review"]:
+            self.assertIn(w, self.low, w)
+
+    def test_failure_and_give_up(self):
+        for w in ["spec fault", "parked question", "blocker", "next slice"]:
+            self.assertIn(w, self.low, w)
+
+    def test_cross_review_pr_merge(self):
+        for w in ["code vs spec", "tests vs spec", "code vs tests", "one pr per slice",
+                  "## Git platforms", "## Permissions and environments", "- [x]"]:
+            self.assertIn(w.lower(), self.low, w)
+
+    def test_summary_honest(self):
+        for w in ["summary", "built", "tests run", "result", "open or parked", "decisions",
+                  '"assumed"', "escalat", "## Prohibitions", "never claim", "not run"]:
+            self.assertIn(w.lower(), self.low, w)
+
+    def test_last_slice(self):
+        for w in ["last slice", "lessons.md", "delete the spec", "git"]:
+            self.assertIn(w, self.low, w)
+
+    def test_tiers(self):
+        for w in ["mid tier", "large tier", "small tier", "## Model and context economy",
+                  "after a failure"]:
+            self.assertIn(w.lower(), self.low, w)
+
+    def test_copilot_continue(self):
+        self.assertRegex(self.text, r"Copilot[^\n]*\"continue\"")
+
+    def test_not_restating_rules(self):
+        items = [l[2:].strip() for h in ["Prohibitions", "Stopping and blockers",
+                                         "Permissions and environments", "Model and context economy"]
+                 for l in section(str(RULES), h).splitlines() if l.startswith("- ")]
+        for p in items:
+            self.assertNotIn(p, self.text)
+
+
 if __name__ == "__main__":
     unittest.main()
