@@ -127,7 +127,7 @@ test_copy_mode() {
 		assert "marker $d" test -f "$HOME/$d/.adk-installed"
 	done
 	assert "rule is real file" test -f "$HOME/.claude/rules/adk.md" -a ! -L "$HOME/.claude/rules/adk.md"
-	assert "rule marker" test "$(head -n1 "$HOME/.claude/rules/adk.md")" = "<!-- adk-installed -->"
+	assert "rule marker" grep -qxF "<!-- adk-installed -->" "$HOME/.claude/rules/adk.md"
 	printf 'b2\n' >"$REPO/skills/adk-b/SKILL.md"
 	rc=0
 	run --copy || rc=$?
@@ -137,9 +137,34 @@ test_copy_mode() {
 	assert "copies removed" test ! -e "$HOME/.claude/skills/adk-a" -a ! -e "$HOME/.agents/skills/adk-b" -a ! -e "$HOME/.claude/rules/adk.md"
 }
 
+# frontmatter <file>: lines between the opening and closing --- (empty if none).
+frontmatter() { awk 'NR == 1 && $0 != "---" { exit } NR > 1 && $0 == "---" { exit } NR > 1' "$1"; }
+fm_has() { frontmatter "$1" | grep -q "$2"; }
+# after_frontmatter <file>: first line after the closing ---.
+after_frontmatter() { awk 'p { print; exit } NR > 1 && $0 == "---" { p = 1 }' "$1"; }
+
+test_copy_mode_keeps_frontmatter() {
+	setup
+	f="$HOME/.copilot/instructions/adk.instructions.md"
+	run --copy
+	assert "starts with ---" test "$(head -n1 "$f")" = "---"
+	assert "applyTo in frontmatter" fm_has "$f" '^applyTo:'
+	assert "marker right after frontmatter" test "$(after_frontmatter "$f")" = "<!-- adk-installed -->"
+	assert "marker not in frontmatter" test "$(frontmatter "$f" | grep -c adk-installed)" = 0
+	rc=0
+	run --copy || rc=$?
+	assert "re-run exit 0" test "$rc" -eq 0
+	assert "re-run recognizes copy" grep -qx "copied $f" "$T/out"
+	run uninstall
+	assert "uninstall removes copy" test ! -e "$f"
+	printf 'plain\n' >"$REPO/rules/adk.md"
+	run --copy
+	assert "no frontmatter: marker on line 1" test "$(head -n1 "$f")" = "<!-- adk-installed -->"
+}
+
 for t in test_install_links_all test_idempotent test_creates_missing_dirs test_conflict_not_overwritten \
 	test_prune_stale_link test_uninstall_keeps_foreign test_home_with_spaces \
-	test_never_touches_claude_md test_copy_mode; do
+	test_never_touches_claude_md test_copy_mode test_copy_mode_keeps_frontmatter; do
 	"$t"
 done
 

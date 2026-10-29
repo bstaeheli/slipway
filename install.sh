@@ -22,14 +22,15 @@ done
 
 say() { printf '%s %s\n' "$1" "$2"; }
 
-# kit_owned <target>: symlink into this repo, or a copy carrying the marker.
+# kit_owned <target>: symlink into this repo, or a copy carrying the marker
+# (marker dir file, or marker line within the first 20 lines of a file).
 kit_owned() {
 	if [ -L "$1" ]; then
 		case $(readlink "$1") in "$REPO"/*) return 0 ;; esac
 		return 1
 	fi
 	if [ -d "$1" ]; then [ -f "$1/.adk-installed" ]; return; fi
-	[ -f "$1" ] && [ "$(head -n 1 "$1")" = "$MARK" ]
+	[ -f "$1" ] && head -n 20 "$1" | grep -qxF "$MARK"
 }
 
 exists() { [ -e "$1" ] || [ -L "$1" ]; }
@@ -57,7 +58,13 @@ link_entry() {
 			cp -R "$src/." "$tgt/"
 			: >"$tgt/.adk-installed"
 		else
-			{ printf '%s\n' "$MARK"; cat "$src"; } >"$tgt"
+			# Marker goes after the closing --- of frontmatter, else on line 1.
+			awk -v m="$MARK" '
+				NR == 1 && $0 != "---" { print m; d = 1 }
+				{ print }
+				!d && NR > 1 && $0 == "---" { print m; d = 1 }
+				END { if (!d) print m }
+			' "$src" >"$tgt"
 		fi
 		say copied "$tgt"
 	else
