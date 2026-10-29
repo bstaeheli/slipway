@@ -190,7 +190,7 @@ class GuardTest(unittest.TestCase):
         r = subprocess.run([sys.executable, str(GUARD), "--tool", "claude"],
                            input=b"\xff\xfe{}", capture_output=True, cwd=str(p))
         self.assertEqual(r.returncode, 2)
-        self.assertIn(b"could not parse", r.stderr)
+        self.assertIn(b"denying", r.stderr)
 
     def run_cli(self, tool, stdin, cwd=None):
         return subprocess.run(
@@ -247,6 +247,35 @@ class GuardTest(unittest.TestCase):
         r = self.run_cli("claude", json.dumps(
             {"tool_input": {"nested": {"command": "cargo publish"}}, "cwd": str(p)}))
         self.assertEqual(r.returncode, 2)
+
+    def test_unexpected_error_denies_inside_allows_outside(self):
+        inside, outside = self.project(), self.project("other", opted_in=False)
+        for p, want in ((inside, True), (outside, False)):
+            stdin = mock.Mock()
+            stdin.buffer.read.return_value = json.dumps(
+                {"cwd": str(p), "tool_input": {"command": "echo hi"}}).encode()
+            with mock.patch.object(guard.sys, "stdin", stdin), \
+                    mock.patch.object(guard, "check", side_effect=RuntimeError("boom")):
+                reason = guard.decide()
+            self.assertEqual(reason is not None, want, str(p))
+
+    def test_deleted_cwd_allows(self):
+        d = self.root / "gone"
+        d.mkdir()
+        p = self.project()
+        script = 'cd "$1" && rmdir "$1" && exec "$2" "$3" --tool claude'
+        for stdin, rc in (("not json", 0),
+                          (json.dumps({"cwd": str(p), "tool_input": {"command": "cargo publish"}}), 2)):
+            r = subprocess.run(["sh", "-c", script, "_", str(d), sys.executable, str(GUARD)],
+                               input=stdin, capture_output=True, text=True)
+            self.assertEqual(r.returncode, rc, r.stderr)
+            d.mkdir(exist_ok=True)
+
+    def test_unknown_home_still_guards(self):
+        p = self.project()
+        with mock.patch.object(guard.Path, "home", side_effect=RuntimeError("no home")):
+            self.assertEqual(guard.opt_in_root(p.resolve()), p.resolve())
+            self.assertDenied("cargo publish", p)
 
 
 if __name__ == "__main__":

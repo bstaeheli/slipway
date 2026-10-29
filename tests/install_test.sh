@@ -205,9 +205,10 @@ test_copy_mode_keeps_frontmatter() {
 
 # jget <json file> <python expression over d> [args...]: print the expression (extra args in sys.argv[3:]).
 jget() { "$PY" -c 'import json, sys; d = json.load(open(sys.argv[1], encoding="utf-8")); print(eval(sys.argv[2]))' "$@"; }
-guard_cmd() { printf '"%s" "%s/hooks/guard.py" --tool %s' "$PY" "$REPO" "$1"; }
-# kit_count <settings>: number of PreToolUse hooks that run this repo's guard.
-kit_count() { jget "$1" "sum(sys.argv[3] in h.get('command', '') for g in d['hooks']['PreToolUse'] for h in g['hooks'])" "$REPO/hooks/guard.py"; }
+guard_run() { printf '"%s" "%s/hooks/guard.py" --tool %s' "$PY" "$REPO" "$1"; }
+guard_cmd() { printf '[ ! -f "%s/hooks/guard.py" ] || %s' "$REPO" "$(guard_run claude)"; }
+# kit_count <settings>: number of PreToolUse hooks that run a kit guard (any clone path).
+kit_count() { jget "$1" "sum(h.get('command', '').endswith('/hooks/guard.py\" --tool claude') for g in d['hooks']['PreToolUse'] for h in g['hooks'])"; }
 ORIG='{"model": "opus", "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command": "mine"}]}], "PostToolUse": [{"matcher": "*", "hooks": [{"type": "command", "command": "post"}]}]}, "env": {"A": "1"}}'
 
 test_hooks_written() {
@@ -217,11 +218,11 @@ test_hooks_written() {
 	s="$HOME/.claude/settings.json"
 	assert "copilot hook linked line" grep -qx "linked $f" "$T/out"
 	# Expressions go through a variable: bash 3.2 mis-parses braces inside nested $(...).
-	want="d == {'version': 1, 'hooks': {'preToolUse': [{'type': 'command', 'bash': sys.argv[3], 'powershell': '& ' + sys.argv[3], 'timeoutSec': 10}]}}"
-	assert "copilot hook schema" test "$(jget "$f" "$want" "$(guard_cmd copilot)")" = True
+	want="d == {'version': 1, 'hooks': {'preToolUse': [{'type': 'command', 'bash': sys.argv[3] + ' || true', 'powershell': 'if (Test-Path \"%s\") { & %s }; exit 0' % (sys.argv[4], sys.argv[3]), 'timeoutSec': 10}]}}"
+	assert "copilot hook schema" test "$(jget "$f" "$want" "$(guard_run copilot)" "$REPO/hooks/guard.py")" = True
 	assert "settings linked line" grep -qx "linked $s" "$T/out"
 	want="d == {'hooks': {'PreToolUse': [{'matcher': 'Bash|PowerShell', 'hooks': [{'type': 'command', 'command': sys.argv[3]}]}]}}"
-	assert "settings entry" test "$(jget "$s" "$want" "$(guard_cmd claude)")" = True
+	assert "settings entry" test "$(jget "$s" "$want" "$(guard_cmd)")" = True
 	assert "no backup without prior settings" test ! -e "$s.adk-backup"
 	run uninstall
 	assert "kit-created settings left empty" test "$(jget "$s" "d")" = "{}"
@@ -244,6 +245,42 @@ test_hook_commands_run() {
 	assert "claude hook allows echo" test "$rc" -eq 0
 	out=$(printf '{"cwd": "%s", "toolName": "bash", "toolArgs": {"command": "cargo publish"}}' "$proj" | sh -c "$b")
 	assert "copilot hook denies publish" test "$(printf '%s' "$out" | "$PY" -c 'import json, sys; print(json.load(sys.stdin)["permissionDecision"])')" = deny
+	# Kit moved or deleted, Python gone: both hooks must exit 0 and print nothing.
+	mv "$REPO/hooks/guard.py" "$REPO/hooks/guard.py.moved"
+	for cmd in "$c" "$b"; do
+		cmd=$(printf '%s' "$cmd" | sed "s|$PY|/nonexistent/python3|g")
+		rc=0
+		out=$(printf '{"cwd": "%s", "tool_input": {"command": "cargo publish"}}' "$proj" | sh -c "$cmd" 2>/dev/null) || rc=$?
+		assert "hook without guard or python exits 0: $cmd" test "$rc" -eq 0
+		assert "hook without guard or python prints nothing: $cmd" test -z "$out"
+	done
+}
+
+test_moved_clone_replaces_entry() {
+	setup
+	s="$HOME/.claude/settings.json"
+	mkdir -p "$HOME/.claude"
+	printf '%s\n' "$ORIG" >"$s"
+	run
+	cp -R "$REPO" "$T/repo2"
+	old=$REPO
+	REPO="$T/repo2"
+	rc=0
+	run status || rc=$?
+	assert "moved clone: status exit 1" test "$rc" -eq 1
+	assert "moved clone: settings stale" grep -qx "conflict $s (stale, re-run install)" "$T/out"
+	assert "moved clone: copilot stale" grep -qx "conflict $HOME/.copilot/hooks/adk-guard.json (stale, re-run install)" "$T/out"
+	run
+	assert "moved clone: exactly one kit entry" test "$(kit_count "$s")" = 1
+	assert "moved clone: entry points at new clone" test "$(jget "$s" "d['hooks']['PreToolUse'][-1]['hooks'][0]['command']")" = "$(guard_cmd)"
+	assert "moved clone: foreign entry untouched" test "$(jget "$s" "d['hooks']['PreToolUse'][0] == json.loads(sys.argv[3])['hooks']['PreToolUse'][0]" "$ORIG")" = True
+	run status
+	assert "moved clone: settings ok after install" grep -qx "ok $s" "$T/out"
+	assert "moved clone: copilot ok after install" grep -qx "ok $HOME/.copilot/hooks/adk-guard.json" "$T/out"
+	# The kit entry is recognised whatever clone wrote it, so uninstall from the old clone removes it.
+	REPO=$old
+	run uninstall
+	assert "uninstall from old clone restores original" test "$(jget "$s" "d == json.loads(sys.argv[3])" "$ORIG")" = True
 }
 
 test_claude_settings_merged_once() {
@@ -265,7 +302,7 @@ json.dump(d, open(p, "w"))' "$s" "$REPO"
 	run
 	assert "stale entry replaced line" grep -qx "linked $s" "$T/out"
 	assert "stale entry replaced, still one" test "$(kit_count "$s")" = 1
-	assert "stale entry now current" test "$(jget "$s" "d['hooks']['PreToolUse'][-1]['hooks'][0]['command']")" = "$(guard_cmd claude)"
+	assert "stale entry now current" test "$(jget "$s" "d['hooks']['PreToolUse'][-1]['hooks'][0]['command']")" = "$(guard_cmd)"
 }
 
 test_backup_created() {
@@ -389,7 +426,7 @@ for t in test_install_links_all test_idempotent test_creates_missing_dirs test_c
 	test_never_touches_claude_md test_copy_mode test_copy_mode_keeps_frontmatter test_hooks_written test_hook_commands_run \
 	test_claude_settings_merged_once test_backup_created test_uninstall_removes_only_guard_entry test_invalid_settings_json \
 	test_missing_python test_status_hooks test_settings_mode_kept test_unexpected_hooks_structure test_bom_settings \
-	test_status_stale_copilot_hook; do
+	test_status_stale_copilot_hook test_moved_clone_replaces_entry; do
 	"$t"
 done
 

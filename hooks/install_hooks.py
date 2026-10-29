@@ -4,8 +4,11 @@
 Usage: install_hooks.py <install|uninstall|status> <settings.json> <copilot hook file> <python> <guard.py>
 
 Prints one line per touched file (linked|ok|removed|conflict <path>) and exits 1 on conflict.
-The kit's settings entry is any PreToolUse hook whose command contains the quoted guard path
-plus `--tool claude`. The Copilot hook file is kit-owned by its name; install.sh and
+The kit's settings entry is any PreToolUse hook whose command ends with
+`/hooks/guard.py" --tool claude`, from any clone path, so a moved clone replaces its orphan.
+Hook commands exit 0 when the guard or the interpreter is gone: the hooks are global, and a
+failure to start must not block tools outside opted-in projects (Claude Code blocks on exit 2,
+Copilot CLI on any non-zero exit). The guard itself denies with exit 2 (Claude) or stdout JSON. The Copilot hook file is kit-owned by its name; install.sh and
 install.ps1 remove it on uninstall themselves, so uninstall here touches settings only.
 """
 import json
@@ -31,14 +34,19 @@ def write(path, text):
     os.replace(tmp, real)
 
 
-def copilot_text(cmd):
-    hook = {"type": "command", "bash": cmd, "powershell": "& " + cmd, "timeoutSec": 10}
+KIT_SUFFIX = '/hooks/guard.py" --tool claude'
+
+
+def copilot_text(python, guard):
+    run = '"{}" "{}" --tool copilot'.format(python, guard)
+    hook = {"type": "command", "bash": run + " || true",
+            "powershell": 'if (Test-Path "{}") {{ & {} }}; exit 0'.format(guard, run), "timeoutSec": 10}
     return json.dumps({"version": 1, "hooks": {"preToolUse": [hook]}}, indent=2) + "\n"
 
 
-def copilot(act, path, cmd):
+def copilot(act, path, python, guard):
     """Return True on conflict."""
-    text = copilot_text(cmd)
+    text = copilot_text(python, guard)
     try:
         with open(path, encoding="utf-8-sig") as f:
             same = f.read() == text
@@ -57,7 +65,7 @@ def copilot(act, path, cmd):
     return False
 
 
-def settings(act, path, cmd, ident):
+def settings(act, path, cmd):
     """Return True on conflict."""
     exists = os.path.exists(path)
     if not exists and act != "install":
@@ -80,7 +88,7 @@ def settings(act, path, cmd, ident):
         return True
 
     def kit(h):
-        return isinstance(h, dict) and isinstance(h.get("command"), str) and ident in h["command"]
+        return isinstance(h, dict) and isinstance(h.get("command"), str) and h["command"].endswith(KIT_SUFFIX)
 
     found, rest = [], []
     for g in pre:
@@ -91,12 +99,13 @@ def settings(act, path, cmd, ident):
                 continue
         rest.append(g)
 
+    current = len(found) == 1 and found[0]["command"] == cmd
     if act == "status":
         if found:
-            say("ok", path)
-        return False
+            say("ok" if current else "conflict", path, "" if current else " (stale, re-run install)")
+        return bool(found) and not current
     if act == "install":
-        if len(found) == 1 and found[0]["command"] == cmd:
+        if current:
             say("ok", path)
             return False
         rest.append({"matcher": "Bash|PowerShell", "hooks": [{"type": "command", "command": cmd}]})
@@ -121,11 +130,11 @@ def main(argv):
         sys.stderr.write(__doc__)
         return 2
     act, settings_path, copilot_path, python, guard = argv
-    ident = '"{}" --tool '.format(guard)
     conflict = False
     if act != "uninstall":
-        conflict |= copilot(act, copilot_path, '"{}" {}copilot'.format(python, ident))
-    conflict |= settings(act, settings_path, '"{}" {}claude'.format(python, ident), ident + "claude")
+        conflict |= copilot(act, copilot_path, python, guard)
+    claude = '[ ! -f "{0}" ] || "{1}" "{0}" --tool claude'.format(guard, python)
+    conflict |= settings(act, settings_path, claude)
     return 1 if conflict else 0
 
 

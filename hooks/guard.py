@@ -55,9 +55,12 @@ def opt_in_root(project_dir: Path) -> Optional[Path]:
 
     The user's home directory and its ancestors never count.
     """
-    home = Path.home().resolve()
+    try:
+        home = Path.home().resolve()
+    except Exception:  # unset HOME and no passwd entry: skip the home exclusion
+        home = None
     for d in [project_dir] + list(project_dir.parents):
-        if d == home or d in home.parents:
+        if home is not None and (d == home or d in home.parents):
             return None
         if (d / "docs" / "agents").is_dir():
             return d
@@ -113,29 +116,35 @@ def find_commands(node) -> List[str]:
     return out
 
 
+def decide() -> Optional[str]:
+    """Deny reason, or None to allow."""
+    project_dir = None
+    try:
+        data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
+        cwd = data.get("cwd") if isinstance(data, dict) else None
+        project_dir = Path(cwd) if isinstance(cwd, str) and cwd else Path(os.getcwd())
+        for cmd in find_commands(data):
+            ok, why = check(cmd, project_dir)
+            if not ok:
+                return why
+        return None
+    except Exception as e:
+        # Fail closed, but only in opted-in projects: the hook is installed globally.
+        # project_dir is the payload cwd when it parsed, else the process cwd. If even that
+        # cannot be resolved (deleted cwd), the project cannot be opted in as far as we know: allow.
+        try:
+            if opt_in_root((project_dir or Path(os.getcwd())).resolve()) is not None:
+                return "guard failed on hook input ({}); denying".format(e)
+        except Exception:
+            pass
+        return None
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tool", choices=["claude", "copilot"], required=True)
     tool = ap.parse_args().tool
-
-    reason = None
-    project_dir = Path(os.getcwd())
-    try:
-        data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
-        cwd = data.get("cwd") if isinstance(data, dict) else None
-        if isinstance(cwd, str) and cwd:
-            project_dir = Path(cwd)
-        for cmd in find_commands(data):
-            ok, why = check(cmd, project_dir)
-            if not ok:
-                reason = why
-                break
-    except Exception as e:
-        # Fail closed, but only in opted-in projects: the hook is installed globally.
-        # project_dir is the payload cwd when it parsed, else the process cwd.
-        if opt_in_root(project_dir.resolve()) is not None:
-            reason = "guard could not parse hook input ({}); denying".format(e)
-
+    reason = decide()
     if reason is None:
         return 0
     if tool == "claude":

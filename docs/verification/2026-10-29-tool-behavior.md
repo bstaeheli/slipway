@@ -26,7 +26,12 @@ was removed afterwards. VS Code and Windows were not available, so those items a
 V6 follow-up (Windows, Copilot CLI):
 1. Run `install.ps1`; in `copilot` ask to run `cargo publish` inside a project with `docs/agents/` and no allowed targets.
 
-Expected (V6 Windows): the command is denied through the hook's `powershell` key (`& "<python>" "<repo>/hooks/guard.py" --tool copilot`). Only the `bash` key was verified (macOS); the `powershell` key is unverified on Windows.
+2. Rename `hooks/guard.py` in the clone; in `copilot` ask to run `echo hello`; restore the file.
+3. In `claude`, repeat steps 1 and 2.
+
+Expected (V6 Windows): step 1 is denied through the hook's `powershell` key (`if (Test-Path "<repo>/hooks/guard.py") { & "<python>" "<repo>/hooks/guard.py" --tool copilot }; exit 0`); in step 2 `echo hello` runs. Only the `bash` key was verified (macOS); the `powershell` key is unverified on Windows.
+
+Expected (Claude Code on Windows, unverified): the settings command is POSIX shell (`[ ! -f "<guard>" ] || "<python>" "<guard>" --tool claude`), on the assumption that Claude Code runs hook commands through Git Bash on Windows as it does its Bash tool. If step 3 shows hooks run under cmd.exe or PowerShell instead, the Windows command needs its own form.
 
 V2/V3 (VS Code, macOS or Windows):
 1. Link `adk-probe` into `~/.claude/skills/` only; open Copilot Chat, type `/`, note whether `adk-probe` is listed. Repeat with `~/.agents/skills/` only.
