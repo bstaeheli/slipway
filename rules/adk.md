@@ -62,7 +62,7 @@ The agent must never:
 - Allowed: `git push`, opening pull requests, publishing to local development environments.
 - Merge each slice's PR yourself, unless `AGENTS.md` contains `merge: human`.
 - Forbidden: publishing to or deleting on customer environments; publishing to package registries (`cargo publish`, `npm publish`, AppSource submissions and similar).
-- Allowed publish targets are listed in `docs/agents/environments.md` under the heading `## Allowed targets`. Each list item's first backtick literal is the target token, for example ``- `bcdev` local Docker container``.
+- Allowed publish targets are listed in `docs/agents/constitution/environments.md` under the heading `## Allowed targets`. Each list item's first backtick literal is the target token, for example ``- `bcdev` local Docker container``.
 - Any target that is not listed counts as a customer environment and is forbidden. Never judge a target by its name.
 
 ## Git platforms
