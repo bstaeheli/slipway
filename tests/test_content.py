@@ -460,6 +460,13 @@ class DocsTest(unittest.TestCase):
             self.assertNotIn("\u2014", t)
             self.assertNotRegex(t, r"gh[ps]_[A-Za-z0-9]{20,}")
 
+    def test_environments_path_matches_guard(self):
+        guard = (ROOT / "hooks" / "guard.py").read_text(encoding="utf-8")
+        m = re.search(r'root / "docs" / "agents" / "constitution" / "(environments\.md)"', guard)
+        self.assertTrue(m)
+        path = "docs/agents/constitution/" + m.group(1)
+        self.assertIn(path, section(str(RULES), "Permissions and environments"))
+
 
 if __name__ == "__main__":
     unittest.main()
