@@ -437,5 +437,29 @@ class BuildSkillTest(unittest.TestCase):
             self.assertNotIn(p, self.text)
 
 
+class DocsTest(unittest.TestCase):
+    def setUp(self):
+        self.plat = (ROOT / "docs" / "platforms.md").read_text(encoding="utf-8")
+        self.readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+    def test_platforms_sections_mention_all_tools(self):
+        for head in ("GitHub", "Azure DevOps", "Forgejo"):
+            body = section(str(ROOT / "docs" / "platforms.md"), head)
+            self.assertTrue(body.strip(), head)
+            for tool in ("Claude Code", "Copilot CLI", "VS Code"):
+                self.assertIn(tool, body, f"{head}: {tool}")
+
+    def test_readme_terms(self):
+        for w in ("install.sh", "install.ps1", "uninstall", "git pull", "adk-bootstrap",
+                  "docs/agents/", "Python 3.9", "--copy", "-Copy", "adk-backup",
+                  "docs/platforms.md", "2026-10-29-tool-behavior.md"):
+            self.assertIn(w, self.readme, w)
+
+    def test_no_em_dash_or_token(self):
+        for t in (self.plat, self.readme):
+            self.assertNotIn("\u2014", t)
+            self.assertNotRegex(t, r"gh[ps]_[A-Za-z0-9]{20,}")
+
+
 if __name__ == "__main__":
     unittest.main()
