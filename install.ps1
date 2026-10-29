@@ -1,15 +1,25 @@
 # Link (or copy) the kit's skills and rules file into user-level tool folders.
 # Usage: install.ps1 [-Action install|uninstall|status] [-Copy] [-UserHome <path>]
 # Windows PowerShell 5.1 compatible. -NoSymlink is a test switch that simulates file symlink failure.
+# Only -Action is positional; anything else unknown or extra lands in $Rest and is rejected.
+[CmdletBinding(PositionalBinding = $false)]
 param(
-	[string]$Action = 'install',
+	[Parameter(Position = 0)][string]$Action = 'install',
 	[switch]$Copy,
 	[string]$UserHome,
-	[switch]$NoSymlink
+	[switch]$NoSymlink,
+	[Parameter(ValueFromRemainingArguments = $true)]$Rest
 )
 
 $Usage = 'usage: install.ps1 [-Action install|uninstall|status] [-Copy] [-UserHome <path>]'
-if ($args.Count -gt 0 -or @('install', 'uninstall', 'status') -notcontains $Action) {
+# pwsh -File rewrites --name to -name before binding, so check the raw arguments after the script path.
+$Dashed = $false
+$AfterScript = $false
+foreach ($a in [Environment]::GetCommandLineArgs()) {
+	if ($AfterScript -and $a.StartsWith('--')) { $Dashed = $true }
+	if ($a -like '*install.ps1') { $AfterScript = $true }
+}
+if ($Dashed -or $Rest.Count -gt 0 -or @('install', 'uninstall', 'status') -notcontains $Action) {
 	[Console]::Error.WriteLine($Usage)
 	exit 2
 }
@@ -52,7 +62,9 @@ function Test-KitOwned([string]$p) {
 	if (-not $i) { return $false }
 	if (Is-Link $i) {
 		$sep = [string][IO.Path]::DirectorySeparatorChar
-		return (Get-LinkTarget $i).StartsWith($Repo + $sep, [StringComparison]::OrdinalIgnoreCase)
+		$cmp = [StringComparison]::Ordinal
+		if ($OnWindows) { $cmp = [StringComparison]::OrdinalIgnoreCase }
+		return (Get-LinkTarget $i).StartsWith($Repo + $sep, $cmp)
 	}
 	if ($i.PSIsContainer) { return Test-Path -LiteralPath (P $p '.adk-installed') -PathType Leaf }
 	return @([IO.File]::ReadAllLines($p)) -contains $Mark

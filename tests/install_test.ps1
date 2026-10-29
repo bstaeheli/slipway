@@ -294,10 +294,63 @@ function test_rules_file_fallback {
 	Check 'repo rule intact' ((Get-Text $srcFile) -eq ($src + "new rule`n"))
 }
 
+function test_rejects_extra_arguments {
+	Setup
+	$stray = P $T 'stray'
+	# No -UserHome here (a stray positional must not bind to it); HOME and USERPROFILE point at the
+	# temp home so a regression can never touch the real one.
+	$saved = @($env:HOME, $env:USERPROFILE)
+	$env:HOME = $H
+	$env:USERPROFILE = $H
+	foreach ($bad in @(@('install', $stray), @('install', '--copy'), @('-Bogus'))) {
+		$a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (P $Repo 'install.ps1')) + $bad
+		$script:Out = @(& $Exe @a 2>&1 | ForEach-Object { "$_" })
+		$script:Rc = $LASTEXITCODE
+		Check "exit 2 for $($bad -join ' ')" ($Rc -eq 2)
+		Check "usage for $($bad -join ' ')" (@($Out | Where-Object { $_ -like 'usage:*' }).Count -eq 1)
+		Check "home untouched for $($bad -join ' ')" (@('.claude', '.agents', '.copilot' | Where-Object { Exists (P $H $_) }).Count -eq 0)
+		Check "nothing created for $($bad -join ' ')" (-not (Exists $stray) -and -not (Exists (P $Repo '--copy')))
+	}
+	$env:HOME = $saved[0]
+	$env:USERPROFILE = $saved[1]
+}
+
+function test_status_output {
+	Setup
+	Run status
+	Check 'status before install exit 0' ($Rc -eq 0)
+	Check 'status before install prints nothing' ($Out.Count -eq 0)
+	Run
+	[IO.Directory]::Delete((P $H '.agents' 'skills' 'adk-b'))
+	$rule = P $H '.claude' 'rules' 'adk.md'
+	[IO.File]::Delete($rule)
+	Set-Text $rule "mine`n"
+	Run status
+	Check 'status exit 1 on conflict' ($Rc -eq 1)
+	$want = @(
+		('ok ' + (P $H '.claude' 'skills' 'adk-a')),
+		('ok ' + (P $H '.agents' 'skills' 'adk-a')),
+		('ok ' + (P $H '.claude' 'skills' 'adk-b')),
+		"conflict $rule",
+		('ok ' + (P $H '.copilot' 'instructions' 'adk.instructions.md')))
+	Check 'status lines only for existing entries' (($Out -join "`n") -eq ($want -join "`n"))
+	Check 'status changes nothing' ((Get-Text $rule) -eq "mine`n")
+}
+
+function test_zero_skills {
+	Setup
+	[IO.Directory]::Delete((P $Repo 'skills'), $true)
+	Run
+	Check 'zero skills exit 0' ($Rc -eq 0)
+	Check 'zero skills: claude rule' (Points-To (P $H '.claude' 'rules' 'adk.md') (P $Repo 'rules' 'adk.md'))
+	Check 'zero skills: copilot rule' (Points-To (P $H '.copilot' 'instructions' 'adk.instructions.md') (P $Repo 'rules' 'adk.md'))
+	Check 'zero skills: no skill dirs' (-not (Exists (P $H '.claude' 'skills')) -and -not (Exists (P $H '.agents' 'skills')))
+}
+
 foreach ($t in 'test_install_links_all', 'test_idempotent', 'test_creates_missing_dirs', 'test_conflict_not_overwritten',
 	'test_prune_stale_link', 'test_prune_rm_failure', 'test_symlinked_repo_path', 'test_uninstall_keeps_foreign',
 	'test_home_with_spaces', 'test_never_touches_claude_md', 'test_copy_mode', 'test_copy_mode_keeps_frontmatter',
-	'test_rules_file_fallback') {
+	'test_rules_file_fallback', 'test_rejects_extra_arguments', 'test_status_output', 'test_zero_skills') {
 	& $t
 }
 
