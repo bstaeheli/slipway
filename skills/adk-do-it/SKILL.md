@@ -5,7 +5,7 @@ description: Implement a small, clear change directly with no spec, test it, and
 
 # adk-do-it
 
-Follow `rules/adk.md` by heading. Run on the mid tier; escalate per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
+Follow `~/.claude/rules/adk.md` by heading. Run on the mid tier; escalate per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
 
 ## Steps
 

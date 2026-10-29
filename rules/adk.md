@@ -5,7 +5,7 @@ description: Agent development kit rules. Active only in repos with docs/agents/
 
 ## Opt-in
 
-Active only if the current repo has `docs/agents/`. Otherwise do nothing and ignore this whole file. Exception: the user asks to bootstrap a project (use `adk-bootstrap`).
+Active only if the current repo has `docs/agents/`. Otherwise do nothing and ignore this whole file. Exception: the user asks to bootstrap a project (tell the user to type `/adk-bootstrap`).
 
 ## Precedence
 

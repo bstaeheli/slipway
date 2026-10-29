@@ -5,7 +5,7 @@ description: Turn a brainstorm result into a spec, design and small runnable sli
 
 # adk-spec
 
-Follow `rules/adk.md` by heading. Run producing and reviewing on the large tier per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
+Follow `~/.claude/rules/adk.md` by heading. Run producing and reviewing on the large tier per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
 
 ## Steps
 

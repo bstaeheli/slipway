@@ -18,7 +18,7 @@
 - Skills: `skills/<name>/SKILL.md`, linked into `~/.claude/skills/<name>` and `~/.agents/skills/<name>`. Never into `~/.copilot/skills`.
 - Rules: `rules/adk.md`, linked to `~/.claude/rules/adk.md` and `~/.copilot/instructions/adk.instructions.md`. Never modify `~/.claude/CLAUDE.md` or other instruction files.
 - Frontmatter: only `name`, `description`, `disable-model-invocation` in `SKILL.md`. No `!cmd` injection, no `context: fork`.
-- Windows user-level paths: `%USERPROFILE%\.claude`, `%USERPROFILE%\.copilot`, `%USERPROFILE%\.agents`. Directories via junctions; files via symlink, else hard link, else copy with warning.
+- Windows user-level paths: `%USERPROFILE%\.claude`, `%USERPROFILE%\.copilot`, `%USERPROFILE%\.agents`. Directories via junctions; files via symlink when allowed, otherwise a marked copy with a re-run warning (no hard links: git checkout replaces files, so they go stale).
 - Installers are idempotent, touch only kit-owned entries, and report every change.
 - Allowed: `git push`, opening PRs, publishing to local dev environments, agent self-merge (overridable in `AGENTS.md`). Strictly forbidden: publish to or delete on customer environments, and publishing to package registries (`cargo publish`, `npm publish`, AppSource and similar). Any target not in `environments.md` counts as customer.
 - Python 3 (stdlib only) is an accepted prerequisite on macOS, Linux and Windows (user decision).
@@ -101,7 +101,7 @@ Use a throwaway probe skill `adk-probe` (frontmatter `name: adk-probe`, `descrip
 | V7 | VS Code reads `~/.copilot/hooks/*.json`; does it also read `~/.claude/settings.json` hooks? | same dumping hook in each location |
 | V8 | VS Code applies `~/.copilot/instructions/x.instructions.md` with `applyTo: "**"` to every chat; Claude loads a symlinked `~/.claude/rules/x.md` and ignores `applyTo`? | rules file containing "say RULES-OK first" |
 | V9 | Copilot CLI non-interactive run flags (prompt, allow tools, model) for the dry run? | `copilot --help` |
-| V10 | Windows: all three tools follow junctions for skills; file symlink/hardlink for rules works? | repeat V1, V2, V4, V8 on a Windows machine |
+| V10 | Windows: all three tools follow junctions for skills; file symlink for rules works? | repeat V1, V2, V4, V8 on a Windows machine |
 
 - [ ] **Step 2: Write consequences**
 
@@ -203,10 +203,10 @@ Tests and assertions:
 **Interfaces:**
 - Produces CLI: `install.ps1 [-Action install|uninstall|status] [-Copy] [-UserHome <path>]`, `-UserHome` defaults to `$env:USERPROFILE` (also `$HOME` when not on Windows, so tests run under `pwsh` on macOS/Linux for logic, and natively on Windows for junctions).
 - Same output prefixes and exit codes as Task 3. Kit-owned: a junction/symlink resolving into the repo, or the copy markers from Task 3.
-- Links: directories via `New-Item -ItemType Junction`; files via `-ItemType SymbolicLink`, on failure `-ItemType HardLink`, on failure copy plus line `copied <path> (re-run install after updates)`. Hard links are recognized as kit-owned by comparing file content with `rules/adk.md` and the marker comment.
+- Links: directories via `New-Item -ItemType Junction`; files via `-ItemType SymbolicLink`, on failure a marked copy plus line `copied <path> (re-run install after updates)` (no hard links: git checkout replaces files, so they go stale).
 - Must run on Windows PowerShell 5.1 (no `??`, no ternary, no `-AsHashtable`).
 
-- [ ] **Step 1: Write `tests/install_test.ps1`** with the same nine test names and assertions as Task 3, plus `test_rules_file_fallback` (simulate symlink failure by a `-NoSymlink` test switch; assert hard link or copy, and the warning line).
+- [ ] **Step 1: Write `tests/install_test.ps1`** with the same nine test names and assertions as Task 3, plus `test_rules_file_fallback` (simulate symlink failure by a `-NoSymlink` test switch; assert a marked copy and the warning line).
 
 - [ ] **Step 2: Run, expect FAIL** `pwsh -File tests/install_test.ps1`
 
@@ -434,7 +434,7 @@ Assertions:
 | S4 rules linked to both rule locations; `CLAUDE.md` untouched | `test_install_links_all`, `test_never_touches_claude_md` |
 | S4 idempotent, reports changes, touches only kit entries | `test_idempotent`, `test_conflict_not_overwritten`, `test_uninstall_keeps_foreign` |
 | S4 uninstall and update path | `test_uninstall_keeps_foreign`, `test_prune_stale_link` |
-| S4 Windows junctions, symlink/hardlink/copy fallback | `install_test.ps1` on `windows-latest`, `test_rules_file_fallback` |
+| S4 Windows junctions, symlink/marked copy fallback | `install_test.ps1` on `windows-latest`, `test_rules_file_fallback` |
 | S4 tested on three OS | `ci.yml` matrix |
 | S4 portable frontmatter only | `lint_skills.py`, `test_lint.py` |
 | S4 verify-first list | Task 1 record V1 to V10 |

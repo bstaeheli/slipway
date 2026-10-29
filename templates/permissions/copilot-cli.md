@@ -5,18 +5,11 @@ everyday commands so the agent does not prompt, deny publishing so it never runs
 unattended. The guard hook (installed by `install.sh` / `install.ps1`) still blocks
 publishes to unlisted targets; these flags only save prompts.
 
-Allow:
+Allow (`shell(git)` allows bare `git` only; `shell(git:*)` allows every git subcommand):
 
 ```sh
 copilot \
-  --allow-tool='shell(git status)' \
-  --allow-tool='shell(git diff)' \
-  --allow-tool='shell(git log)' \
-  --allow-tool='shell(git add)' \
-  --allow-tool='shell(git commit)' \
-  --allow-tool='shell(git push)' \
-  --allow-tool='shell(git switch)' \
-  --allow-tool='shell(git fetch)' \
+  --allow-tool='shell(git:*)' \
   --allow-tool='shell(al-runner)' \
   --allow-tool='shell(cargo build)' \
   --allow-tool='shell(cargo test)' \

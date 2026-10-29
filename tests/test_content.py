@@ -40,6 +40,8 @@ class RulesTest(unittest.TestCase):
         body = section(str(RULES), "Opt-in")
         self.assertIn("docs/agents/", body)
         self.assertIn("do nothing", body)
+        # adk-bootstrap has disable-model-invocation, so the agent cannot run it itself.
+        self.assertIn("tell the user to type `/adk-bootstrap`", body)
 
     def test_headings_in_order(self):
         self.assertEqual(re.findall(r"^## (.+)$", self.text, re.M), HEADINGS)
@@ -93,7 +95,8 @@ class PermissionTemplatesTest(unittest.TestCase):
         self.deny_cmds = {rule_command(r) for r in self.deny}
 
     def test_claude_allow(self):
-        for r in ["Bash(git push:*)", "Bash(git commit:*)", "Bash(al-runner:*)", "Bash(cargo test:*)"]:
+        for r in ["Bash(git push:*)", "Bash(git commit:*)", "Bash(git merge:*)", "Bash(git checkout:*)",
+                  "Bash(git branch:*)", "Bash(git pull:*)", "Bash(al-runner:*)", "Bash(cargo test:*)"]:
             self.assertIn(r, self.allow)
 
     def test_claude_deny(self):
@@ -119,7 +122,8 @@ class PermissionTemplatesTest(unittest.TestCase):
         text = (TEMPLATES / "copilot-cli.md").read_text(encoding="utf-8")
         allow = set(re.findall(r"--allow-tool='shell\(([^)]+)\)'", text))
         deny = set(re.findall(r"--deny-tool='shell\(([^)]+)\)'", text))
-        self.assertEqual(allow, self.allow_cmds)
+        # Copilot allows git subcommands as one rule; the dry run showed shell(git:*) works.
+        self.assertEqual(allow, {c for c in self.allow_cmds if not c.startswith("git ")} | {"git:*"})
         self.assertEqual(deny, self.deny_cmds)
         self.assertNotIn("—", text)
 
@@ -198,7 +202,7 @@ class FrontEndSkillsTest(unittest.TestCase):
                         for l in section(str(RULES), h).splitlines() if l.startswith("- ")]
         for n in self.NAMES:
             t = self.skill(n)
-            self.assertIn("rules/adk.md", t, n)
+            self.assertIn("~/.claude/rules/adk.md", t, n)
             for p in prohibitions:
                 self.assertNotIn(p, t, n)
         for n in self.NAMES[1:]:
@@ -454,6 +458,15 @@ class DocsTest(unittest.TestCase):
                   "docs/agents/", "Python 3.9", "--copy", "-Copy", "adk-backup",
                   "docs/platforms.md", "2026-10-29-tool-behavior.md", "-ExecutionPolicy Bypass"):
             self.assertIn(w, self.readme, w)
+        self.assertIn("type `/adk-bootstrap`", self.readme)
+        self.assertIn("Moved the kit or changed Python: re-run install. Deleting the kit: run uninstall first.", self.readme)
+
+    def test_skills_reference_installed_rules_path(self):
+        # A bare `rules/adk.md` resolves against the user's repo, where it does not exist.
+        for f in sorted((ROOT / "skills").glob("*/SKILL.md")):
+            t = f.read_text(encoding="utf-8")
+            self.assertIn("Follow `~/.claude/rules/adk.md`", t, f.parent.name)
+            self.assertNotIn("Follow `rules/adk.md`", t, f.parent.name)
 
     def test_no_em_dash_or_token(self):
         for t in (self.plat, self.readme):

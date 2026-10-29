@@ -31,11 +31,12 @@ The installer links `skills/*` into `~/.claude/skills` and `~/.agents/skills`, l
 - Before its first change it writes `~/.claude/settings.json.adk-backup`. The merge re-indents settings.json, normalizes number spelling and collapses duplicate keys. Values stay equal; the backup has the original.
 - Link mode is the default. `--copy` (`install.sh`) or `-Copy` (`install.ps1`) copies instead, marked so it can be removed later; re-run the install after updates.
 - Windows: directories are junctions, the rules file is a symbolic link (needs Developer Mode or elevation), else a marked copy, so re-run install after `git pull`. No hard links.
+- Moved the kit or changed Python: re-run install. Deleting the kit: run uninstall first.
 - Update: `git pull`, then re-run the installer. Uninstall: `sh install.sh uninstall` / `powershell -ExecutionPolicy Bypass -File .\install.ps1 uninstall`.
 
 ## Opt in per repo
 
-The kit acts only in repos that have `docs/agents/`. Ask the agent to run `adk-bootstrap` to create it (constitution, status, lessons). Elsewhere the rules and skills do nothing.
+The kit acts only in repos that have `docs/agents/`. To create it (constitution, status, lessons), type `/adk-bootstrap`; the agent cannot start it by itself. Elsewhere the rules and skills do nothing.
 
 ## Guard
 
@@ -55,4 +56,4 @@ Not yet verified by hand (checklists in [docs/verification/2026-10-29-tool-behav
 
 - VS Code: whether it follows symlinked skills, reads the hook in `~/.copilot/hooks/`, and applies the rules file. If skills do not appear, use `--copy` / `-Copy`.
 - VS Code reads both `~/.claude/skills` and `~/.agents/skills`, so each skill may show twice. Harmless; disable one location in VS Code if it bothers you.
-- Windows junctions and the Copilot CLI `powershell` hook key.
+- Windows junctions, the Copilot CLI `powershell` hook key, and whether Claude Code runs hook commands through Git Bash on Windows.

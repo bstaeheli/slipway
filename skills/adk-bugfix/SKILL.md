@@ -5,7 +5,7 @@ description: Fix a bug test-first with a reproduction test, then ship it. Applie
 
 # adk-bugfix
 
-Follow `rules/adk.md` by heading. Run on the mid tier; escalate per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
+Follow `~/.claude/rules/adk.md` by heading. Run on the mid tier; escalate per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
 
 ## Steps
 

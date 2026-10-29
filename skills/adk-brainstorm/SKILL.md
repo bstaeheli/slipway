@@ -5,7 +5,7 @@ description: Front door for new work. Talk through the problem with the user, th
 
 # adk-brainstorm
 
-Follow `rules/adk.md` (`## Workflow`, `## Model and context economy`). Run on the large tier. This is the only step where the user is present.
+Follow `~/.claude/rules/adk.md` (`## Workflow`, `## Model and context economy`). Run on the large tier. This is the only step where the user is present.
 
 ## Steps
 

@@ -133,8 +133,7 @@ All three tools support the open Agent Skills format (`SKILL.md` with `name` and
    - **Reporting.** It reports what it changed.
    - **Windows links:**
      - Directories link through junctions, which need neither admin rights nor Developer Mode.
-     - Single files, such as the rules file, use a symlink when allowed, otherwise a hard link.
-     - If neither works, it copies the file and warns that updates need a re-run.
+     - Single files, such as the rules file, use a symlink when allowed, otherwise a marked copy with a re-run warning (no hard links: git checkout replaces files, so they go stale).
    - **Windows user-level paths:** `%USERPROFILE%\.claude`, `%USERPROFILE%\.copilot`, `%USERPROFILE%\.agents`.
    - **Tests.** The install scripts must be tested on all three operating systems.
    - **CI (our call).** GitHub Actions with an Ubuntu, macOS and Windows matrix. Forgejo Actions reads the same syntax but usually lacks macOS and Windows runners.

@@ -5,7 +5,7 @@ description: Build a spec slice by slice after adk-spec, with contracts, code an
 
 # adk-build
 
-Follow `rules/adk.md` by heading. The user is not present: stop only for blockers per `## Stopping and blockers`. Input: `docs/agents/specs/<slug>.md` and the slice lines in `docs/agents/status.md`.
+Follow `~/.claude/rules/adk.md` by heading. The user is not present: stop only for blockers per `## Stopping and blockers`. Input: `docs/agents/specs/<slug>.md` and the slice lines in `docs/agents/status.md`.
 
 ## Steps
 
