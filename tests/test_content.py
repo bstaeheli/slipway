@@ -210,10 +210,12 @@ class FrontEndSkillsTest(unittest.TestCase):
             self.assertIn("merge: human", t)
 
     def test_cited_headings_exist(self):
-        heads = set(re.findall(r"^## (.+?)\s*$", RULES.read_text(encoding="utf-8"), re.M))
+        # A cited heading must exist in the rules or in a kit template (status.md, spec.md).
+        sources = [RULES, *(ROOT / "skills").glob("*/templates/*.md")]
+        heads = {h for f in sources for h in re.findall(r"^#{2,3} (.+?)\s*$", f.read_text(encoding="utf-8"), re.M)}
         cited = 0
         for md in sorted((ROOT / "skills").glob("*/SKILL.md")):
-            for h in re.findall(r"`## ([^`]+)`", md.read_text(encoding="utf-8")):
+            for h in re.findall(r"`#{2,3} ([^`]+)`", md.read_text(encoding="utf-8")):
                 cited += 1
                 self.assertIn(h, heads, f"{md.parent.name}: {h}")
         self.assertGreater(cited, 0)
@@ -250,6 +252,62 @@ class FrontEndSkillsTest(unittest.TestCase):
         self.assertLess(low.index("reproduction test"), low.index("fix the cause"))
         for w in ["fails", "passes", "never alter", "what changed", "tests run", "decisions", "escalat"]:
             self.assertIn(w, low, w)
+
+
+SPEC = ROOT / "skills" / "adk-spec"
+
+
+class SpecSkillTest(unittest.TestCase):
+    def setUp(self):
+        self.text = (SPEC / "SKILL.md").read_text(encoding="utf-8")
+        self.low = self.text.lower()
+
+    def test_frontmatter(self):
+        self.assertRegex(self.text, r"(?m)^name: adk-spec$")
+        desc = re.search(r"^description: (.+)$", self.text, re.M).group(1)
+        self.assertIn("docs/agents/", desc)
+        self.assertNotIn("disable-model-invocation", self.text)
+
+    def test_template_headings_exact(self):
+        tpl = (SPEC / "templates" / "spec.md").read_text(encoding="utf-8")
+        self.assertEqual(re.findall(r"^(#{2,3} .+?)\s*$", tpl, re.M), [
+            "## Intent", "## Must", "## Must not", "## Acceptance", "## Design",
+            "### Context", "### Graph", "### Acceptance checks", "## Slices"])
+        self.assertIn("S1", section(str(SPEC / "templates" / "spec.md"), "Slices"))
+        self.assertNotIn("—", tpl)
+
+    def test_output_contract(self):
+        for s in ["docs/agents/specs/<slug>.md", "templates/spec.md", "docs/agents/status.md",
+                  "## Active", "- [ ] <slug>/S<n>: <title>", "adk-build"]:
+            self.assertIn(s, self.text, s)
+
+    def test_spec_content(self):
+        for w in ["intent", "must not", "acceptance", "layout", "wording", "unsaid", "implementer"]:
+            self.assertIn(w, self.low, w)
+        self.assertRegex(self.low, r"never[^.\n]*how")
+
+    def test_design_and_slicing(self):
+        for w in ["context", "graph", "acceptance checks", "independently runnable", "testable"]:
+            self.assertIn(w, self.low, w)
+        self.assertRegex(self.low, r"plan[^.\n]*(never|not) written")
+
+    def test_review_loop(self):
+        for w in ["review", "violations only", "never invent", "re-debate", "3 rounds",
+                  "## Parked", "separate subagent"]:
+            self.assertIn(w.lower(), self.low, w)
+        for step in ["spec", "design", "plan", "slicing"]:
+            self.assertRegex(self.low, rf"after[^.\n]*{step}", step)
+
+    def test_summary_and_tier(self):
+        for w in ["summary", "few lines", "large tier", "## Blockers for the user",
+                  "## Model and context economy", "## Stopping and blockers"]:
+            self.assertIn(w.lower(), self.low, w)
+
+    def test_not_restating_rules(self):
+        items = [l[2:].strip() for h in ["Stopping and blockers", "Model and context economy"]
+                 for l in section(str(RULES), h).splitlines() if l.startswith("- ")]
+        for p in items:
+            self.assertNotIn(p, self.text)
 
 
 if __name__ == "__main__":
