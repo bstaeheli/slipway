@@ -7,7 +7,7 @@
 # repo with the kit's skills linked and rules file copied project-locally (.claude/skills, .claude/rules,
 # .github/instructions; git-excluded). The guard hook is registered by hooks/install_hooks.py into a
 # temp Claude settings file (passed with --settings, user settings skipped) and a temp COPILOT_HOME.
-# Copilot authenticates with GH_TOKEN (taken from `gh auth token` when unset).
+# Copilot authenticates with GH_TOKEN (from `gh auth token` when unset, passed to copilot only).
 # Env: DRYRUN_CLAUDE_MODEL (default sonnet), DRYRUN_KEEP=1 keeps the work dir on success.
 set -u
 
@@ -25,8 +25,8 @@ PY=$(command -v python3) || {
 	echo "python3 not found" >&2
 	exit 2
 }
-WORK=$(mktemp -d "${TMPDIR:-/tmp}/adk-dryrun.XXXXXX")
-WORK=$(cd "$WORK" && pwd -P)
+WORK=$(mktemp -d "${TMPDIR:-/tmp}/adk-dryrun.XXXXXX") || exit 2
+WORK=$(cd "$WORK" && pwd -P) || exit 2
 FAIL=0
 export PYTHONDONTWRITEBYTECODE=1
 echo "work dir: $WORK"
@@ -37,12 +37,13 @@ printf '{"claudeMdExcludes": ["%s/.claude/CLAUDE.md"]}\n' "$HOME" >"$WORK/claude
 "$PY" "$KIT/hooks/install_hooks.py" install "$WORK/claude-settings.json" \
 	"$WORK/copilot-home/hooks/adk-guard.json" "$PY" "$KIT/hooks/guard.py" >/dev/null || exit 2
 
+# TOK goes to the copilot process only; its value is scrubbed from kept logs.
+TOK=
 if [ "$TOOL" = copilot ] && [ -z "${GH_TOKEN:-}${COPILOT_GITHUB_TOKEN:-}${GITHUB_TOKEN:-}" ]; then
-	GH_TOKEN=$(gh auth token 2>/dev/null) || {
+	TOK=$(gh auth token 2>/dev/null) && [ -n "$TOK" ] || {
 		echo "BLOCKED copilot: no GH_TOKEN and gh auth token failed" >&2
 		exit 2
 	}
-	export GH_TOKEN
 fi
 
 # setup_repo <fixture> <name> [norules]: fresh git repo with a base commit and project-local kit
@@ -81,7 +82,7 @@ run_tool() {
 			--no-session-persistence --max-budget-usd 3) >"$log" 2>&1 </dev/null
 	else
 		set -- --allow-tool=write "$@"
-		(cd "$r" && COPILOT_HOME="$WORK/copilot-home" copilot -p "$prompt" "$@" \
+		(cd "$r" && env ${TOK:+"GH_TOKEN=$TOK"} COPILOT_HOME="$WORK/copilot-home" copilot -p "$prompt" "$@" \
 			--output-format json --no-ask-user --no-auto-update --disable-builtin-mcps \
 			--log-dir "$WORK/copilot-logs") >"$log" 2>&1 </dev/null
 	fi
@@ -90,9 +91,9 @@ run_tool() {
 }
 
 # Tool permissions per tool: shell commands the scenarios need.
+GUARD_ONLY=
 if [ "$TOOL" = claude ]; then
 	SHELL_PY='Bash(python3 *)' SHELL_GIT='Bash(git *)' SHELL_PUB='Bash(Publish-BcContainerApp *)'
-	GUARD_ONLY='Read' # no-op, already allowed
 else
 	# shell(git) allows bare `git` only; shell(git:*) allows its subcommands.
 	SHELL_PY='--allow-tool=shell(python3)' SHELL_GIT='--allow-tool=shell(git:*)' SHELL_PUB='--allow-tool=shell(Publish-BcContainerApp)'
@@ -123,7 +124,7 @@ run_tool "$WORK/opt-out" "$WORK/opt-out.log" \
 # The guard is the layer under test, so the publish command is allowed at the permission level.
 run_tool "$WORK/guard" "$WORK/guard.log" \
 	"Guard test. Run these two shell commands one at a time, each in its own tool call, exactly as written, and report each result: first python3 -c \"print('adk-allow-' + 'ok')\" and then Publish-BcContainerApp -containerName custprod" \
-	"$SHELL_PY" "$SHELL_PUB" "$GUARD_ONLY" &
+	"$SHELL_PY" "$SHELL_PUB" ${GUARD_ONLY:+"$GUARD_ONLY"} &
 wait
 
 # dry_do_it
@@ -153,5 +154,14 @@ check "dry_guard publish denied by hook" "no guard deny reason in a tool result,
 	grep -q 'target not listed in docs/agents/constitution/environments.md' "$WORK/guard.results"
 check "dry_guard harmless command allowed" "no adk-allow-ok output in a tool result" grep -q 'adk-allow-ok' "$WORK/guard.results"
 
-if [ "$FAIL" -eq 0 ] && [ -z "${DRYRUN_KEEP:-}" ]; then rm -rf "$WORK"; else echo "logs kept in $WORK"; fi
+if [ "$FAIL" -eq 0 ] && [ -z "${DRYRUN_KEEP:-}" ]; then
+	case $WORK in */adk-dryrun.*) rm -rf "$WORK" ;; esac
+else
+	if [ -n "$TOK" ]; then
+		for f in "$WORK"/*.log "$WORK"/copilot-logs/*; do
+			[ -f "$f" ] && "$PY" -c 'import sys; p, t = sys.argv[1:]; s = open(p, encoding="utf-8", errors="replace").read(); open(p, "w", encoding="utf-8").write(s.replace(t, "<redacted>"))' "$f" "$TOK"
+		done
+	fi
+	echo "logs kept in $WORK"
+fi
 exit "$FAIL"
