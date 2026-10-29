@@ -194,7 +194,8 @@ class FrontEndSkillsTest(unittest.TestCase):
             self.assertNotIn("disable-model-invocation", t, n)
 
     def test_reference_rules_by_heading_not_restated(self):
-        prohibitions = [l[2:].strip() for l in section(str(RULES), "Prohibitions").splitlines() if l.startswith("- ")]
+        prohibitions = [l[2:].strip() for h in ["Prohibitions", "Stopping and blockers", "Permissions and environments"]
+                        for l in section(str(RULES), h).splitlines() if l.startswith("- ")]
         for n in self.NAMES:
             t = self.skill(n)
             self.assertIn("rules/adk.md", t, n)
@@ -207,6 +208,22 @@ class FrontEndSkillsTest(unittest.TestCase):
             self.assertIn("## Model and context economy", t)
             self.assertIn("tech-stack.md", t)
             self.assertIn("merge: human", t)
+
+    def test_cited_headings_exist(self):
+        heads = set(re.findall(r"^## (.+?)\s*$", RULES.read_text(encoding="utf-8"), re.M))
+        cited = 0
+        for md in sorted((ROOT / "skills").glob("*/SKILL.md")):
+            for h in re.findall(r"`## ([^`]+)`", md.read_text(encoding="utf-8")):
+                cited += 1
+                self.assertIn(h, heads, f"{md.parent.name}: {h}")
+        self.assertGreater(cited, 0)
+
+    def test_give_up_rule(self):
+        for n in ["adk-do-it", "adk-bugfix"]:
+            t = self.skill(n)
+            self.assertIn("3 attempts", t, n)
+            self.assertIn("blocker", t.lower(), n)
+            self.assertIn("docs/agents/status.md", t, n)
 
     def test_brainstorm(self):
         t = self.skill("adk-brainstorm")
