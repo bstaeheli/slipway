@@ -38,6 +38,22 @@ class LintTest(unittest.TestCase):
     def test_long_description_rejected(self):
         self.assertTrue(lint(make(GOOD.replace("A demo skill.", "x" * 1025))))
 
+    def test_unquoted_colon_space_rejected(self):
+        self.assertTrue(lint(make(GOOD.replace("A demo skill.", "Do x: then y."))))
+
+    def test_unquoted_comment_rejected(self):
+        self.assertTrue(lint(make(GOOD.replace("A demo skill.", "Do x #then y."))))
+
+    def test_leading_special_rejected(self):
+        for c in "*&!|>%@[{":
+            self.assertTrue(lint(make(GOOD.replace("A demo skill.", c + "x"))), c)
+
+    def test_quoted_colon_allowed(self):
+        self.assertEqual(lint(make(GOOD.replace("A demo skill.", '"Do x: then y."'))), [])
+
+    def test_repo_skills_pass(self):
+        self.assertEqual(lint(Path(__file__).resolve().parent.parent / "skills"), [])
+
 
 if __name__ == "__main__":
     unittest.main()

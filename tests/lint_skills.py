@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 
 ALLOWED = {"name", "description", "disable-model-invocation"}
+YAML_SPECIAL = set("-?:,[]{}#&*!|>%@`")
 
 
 def lint(skills: Path) -> list[str]:
@@ -20,6 +21,9 @@ def lint(skills: Path) -> list[str]:
         keys = dict(re.findall(r"^([A-Za-z-]+):\s*(.*)$", m.group(1), re.M))
         for k in keys.keys() - ALLOWED:
             errs.append(f"{md}: disallowed frontmatter key {k!r}")
+        for k, v in keys.items():
+            if v[:1] not in {"'", '"'} and (": " in v or " #" in v or v.endswith(":") or v[:1] in YAML_SPECIAL):
+                errs.append(f"{md}: frontmatter {k!r} must be quoted or avoid ': ', ' #' and a leading special character")
         name = keys.get("name", "")
         if name != md.parent.name or not re.fullmatch(r"[a-z0-9-]{1,64}", name):
             errs.append(f"{md}: name {name!r} must equal folder and match [a-z0-9-]{{1,64}}")

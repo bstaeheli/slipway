@@ -365,8 +365,40 @@ class BuildSkillTest(unittest.TestCase):
             self.assertIn(w.lower(), self.low, w)
 
     def test_last_slice(self):
-        for w in ["last slice", "lessons.md", "delete the spec", "git"]:
+        for w in ["lessons.md", "delete the spec", "git keeps the history"]:
             self.assertIn(w, self.low, w)
+
+    def test_summary_timing_and_records(self):
+        self.assertIn("no buildable slice of the spec remains under `## active`", self.low)
+        line = next(l for l in self.low.splitlines() if "record in the pr description" in l)
+        for w in ["tests run with results", "decisions", "escalations", "docs/agents/status.md"]:
+            self.assertIn(w, line, w)
+        self.assertIn("build it from the pr descriptions and status notes", self.low)
+
+    def test_resume_wraps_up_and_flags_closed_prs(self):
+        resume = next(l for l in self.low.splitlines() if l.startswith("1. **resume"))
+        self.assertIn("completes a spec", resume)
+        self.assertIn("wrap-up", resume)
+        self.assertIn("closed without merging", resume)
+        self.assertIn("## blockers for the user", resume)
+
+    def test_rerun_tests_after_cross_review(self):
+        line = next(l for l in self.low.splitlines() if "**cross-review" in l)
+        self.assertIn("rerun step 5", line)
+
+    def test_stacked_branch(self):
+        line = next(l for l in self.low.splitlines() if "stacked" in l)
+        self.assertIn("awaits merge", line)
+        self.assertIn("pr description", line)
+
+    def test_give_up_any_fix_loop(self):
+        line = next(l for l in self.low.splitlines() if "3 attempts" in l)
+        for w in ["any fix loop", "lane review", "test failure", "cross-review"]:
+            self.assertIn(w, line, w)
+
+    def test_test_fault_cites_prohibitions(self):
+        line = next(l for l in self.text.splitlines() if "goes back to that lane" in l)
+        self.assertIn("`## Prohibitions`", line)
 
     def test_human_merge_pending(self):
         self.assertIn("- [ ] <slug>/S<n>: <title> (PR <link>, awaiting human merge)", self.text)
@@ -382,9 +414,17 @@ class BuildSkillTest(unittest.TestCase):
         self.assertLess(line.find("merged"), line.find("delete the spec"))
 
     def test_tiers(self):
-        for w in ["mid tier", "large tier", "small tier", "## Model and context economy",
-                  "after a failure"]:
-            self.assertIn(w.lower(), self.low, w)
+        tiers = self.low[self.low.index("## tiers"):]
+        lines = tiers.splitlines()
+        def line_with(w):
+            return next(l for l in lines if w in l)
+        self.assertIn("mid tier", line_with("code lane"))
+        self.assertIn("mid tier", line_with("test lane"))
+        self.assertIn("large tier", line_with("reviews"))
+        self.assertIn("large tier", line_with("failure analysis"))
+        self.assertIn("small tier", line_with("status updates"))
+        for w in ["## model and context economy", "after a failure"]:
+            self.assertIn(w, tiers, w)
 
     def test_copilot_continue(self):
         self.assertRegex(self.text, r"Copilot[^\n]*\"continue\"")
