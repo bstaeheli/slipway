@@ -452,7 +452,7 @@ class DocsTest(unittest.TestCase):
     def test_readme_terms(self):
         for w in ("install.sh", "install.ps1", "uninstall", "git pull", "adk-bootstrap",
                   "docs/agents/", "Python 3.9", "--copy", "-Copy", "adk-backup",
-                  "docs/platforms.md", "2026-10-29-tool-behavior.md"):
+                  "docs/platforms.md", "2026-10-29-tool-behavior.md", "-ExecutionPolicy Bypass"):
             self.assertIn(w, self.readme, w)
 
     def test_no_em_dash_or_token(self):

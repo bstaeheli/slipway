@@ -21,15 +21,17 @@ sh install.sh            # also: sh install.sh status | uninstall
 Windows (PowerShell 5.1+):
 
 ```powershell
-.\install.ps1            # also: .\install.ps1 status | uninstall
+powershell -ExecutionPolicy Bypass -File .\install.ps1            # also: status | uninstall, -Copy
 ```
+
+The default execution policy blocks `.\install.ps1`; `-ExecutionPolicy Bypass` applies to this process only and changes no system setting. With PowerShell 7 use `pwsh -ExecutionPolicy Bypass -File .\install.ps1`.
 
 The installer links `skills/*` into `~/.claude/skills` and `~/.agents/skills`, links `rules/adk.md` to `~/.claude/rules/adk.md` and `~/.copilot/instructions/adk.instructions.md`, and registers `hooks/guard.py` as a pre-tool hook in `~/.claude/settings.json` and `~/.copilot/hooks/adk-guard.json`. It never overwrites foreign files: it prints `conflict <path>` and exits 1. Other output lines are `linked`, `copied`, `ok`, `removed`.
 
 - Before its first change it writes `~/.claude/settings.json.adk-backup`. The merge re-indents settings.json, normalizes number spelling and collapses duplicate keys. Values stay equal; the backup has the original.
 - Link mode is the default. `--copy` (`install.sh`) or `-Copy` (`install.ps1`) copies instead, marked so it can be removed later; re-run the install after updates.
 - Windows: directories are junctions, the rules file is a symbolic link (needs Developer Mode or elevation), else a marked copy, so re-run install after `git pull`. No hard links.
-- Update: `git pull`, then re-run the installer. Uninstall: `sh install.sh uninstall` / `.\install.ps1 uninstall`.
+- Update: `git pull`, then re-run the installer. Uninstall: `sh install.sh uninstall` / `powershell -ExecutionPolicy Bypass -File .\install.ps1 uninstall`.
 
 ## Opt in per repo
 
