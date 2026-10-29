@@ -74,7 +74,9 @@ def check(command: str, project_dir: Path) -> Tuple[bool, str]:
         return True, "project not opted in"
     if not any(p.search(command) for p in PUBLISH_OR_REMOTE_DELETE):
         return True, "no publish or remote delete"
-    if any(t in command for t in allowed_targets(root)):
+    # Whole-token match: `bcdev` must not allow `bcdev-cust.example` or `xbcdev`.
+    if any(re.search(r"(?<![A-Za-z0-9._-])" + re.escape(t) + r"(?![A-Za-z0-9._-])", command)
+           for t in allowed_targets(root)):
         return True, "target listed"
     return False, DENY_REASON
 
@@ -109,8 +111,10 @@ def main() -> int:
             if not ok:
                 reason = why
                 break
-    except Exception as e:  # fail closed on malformed hook input
-        reason = "guard could not parse hook input ({}); denying".format(e)
+    except Exception as e:
+        # Fail closed, but only in opted-in projects: the hook is installed globally.
+        if opt_in_root(Path(os.getcwd()).resolve()) is not None:
+            reason = "guard could not parse hook input ({}); denying".format(e)
 
     if reason is None:
         return 0

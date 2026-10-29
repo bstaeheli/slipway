@@ -102,10 +102,16 @@ class GuardTest(unittest.TestCase):
         self.assertDenied("cargo publish", sub)
         self.assertAllowed("Publish-BcContainerApp -containerName bcdev", sub)
 
-    def run_cli(self, tool, stdin):
+    def test_listed_target_prefix_not_allowed(self):
+        p = self.project()
+        self.assertDenied("ssh bcdev-cust.example", p)
+        self.assertDenied("ssh xbcdev", p)
+        self.assertAllowed("ssh bcdev", p)
+
+    def run_cli(self, tool, stdin, cwd=None):
         return subprocess.run(
             [sys.executable, str(GUARD), "--tool", tool],
-            input=stdin, capture_output=True, text=True)
+            input=stdin, capture_output=True, text=True, cwd=cwd)
 
     def test_cli_claude_deny_exit_2(self):
         p = self.project()
@@ -134,12 +140,19 @@ class GuardTest(unittest.TestCase):
             self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""), tool)
 
     def test_malformed_input_denies(self):
-        r = self.run_cli("claude", "not json")
+        p = self.project()
+        r = self.run_cli("claude", "not json", cwd=str(p))
         self.assertEqual(r.returncode, 2)
         self.assertNotEqual(r.stderr, "")
-        r = self.run_cli("copilot", "not json")
+        r = self.run_cli("copilot", "not json", cwd=str(p))
         self.assertEqual(r.returncode, 0)
         self.assertEqual(json.loads(r.stdout)["permissionDecision"], "deny")
+
+    def test_malformed_input_outside_opt_in_allows(self):
+        p = self.project(opted_in=False)
+        for tool in ("claude", "copilot"):
+            r = self.run_cli(tool, "not json", cwd=str(p))
+            self.assertEqual((r.returncode, r.stdout, r.stderr), (0, "", ""), tool)
 
     def test_nested_command_key(self):
         self.assertEqual(
