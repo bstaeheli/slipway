@@ -363,10 +363,14 @@ function Guard-Id([string]$tool) { '"' + (Guard-Path) + '" --tool ' + $tool }
 # "<python>" "<guard>" --tool <tool>
 function Is-KitRun([string]$c, [string]$tool) { $c.StartsWith('"') -and $c.EndsWith('" ' + (Guard-Id $tool)) }
 # Kit hooks in settings, from any clone path.
+# Callers wrap in @(): a one-element result unrolls to a PSCustomObject, which has no .Count in 5.1.
 function Kit-Hooks {
 	@(@((Read-Json (Settings-Path)).hooks.PreToolUse) | ForEach-Object { @($_.hooks) } | Where-Object { $_.command -like '*/hooks/guard.py" --tool claude' })
 }
 # Replace the interpreter path (the first quoted string after the guard test) in a hook command.
+# Run PowerShell code in a child process. -EncodedCommand, because Windows PowerShell 5.1 strips
+# embedded double quotes from native command arguments.
+function Run-Ps([string]$code) { & $Exe -NoProfile -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))) }
 function Without-Python([string]$c) {
 	$py = [regex]::Match($c, '(?:^|\|\| |& )"([^"]+)" "').Groups[1].Value
 	$c.Replace('"' + $py + '"', '"/nonexistent/python3"')
@@ -415,7 +419,7 @@ function test_hook_commands_run {
 	$deny = '{"cwd": "' + $cwd + '", "toolName": "bash", "toolArgs": {"command": "cargo publish"}, "tool_input": {"command": "cargo publish"}}'
 	$allow = '{"cwd": "' + $cwd + '", "tool_input": {"command": "echo hi"}}'
 	$ps = (Copilot-Hook).powershell
-	$out = $deny | & $Exe -NoProfile -Command $ps
+	$out = $deny | Run-Ps $ps
 	Check 'copilot powershell hook denies publish' ((($out -join '') | ConvertFrom-Json).permissionDecision -eq 'deny')
 	$c = @((Read-Json (Settings-Path)).hooks.PreToolUse)[0].hooks[0].command
 	$b = (Copilot-Hook).bash
@@ -429,7 +433,7 @@ function test_hook_commands_run {
 	}
 	# Kit moved or deleted, Python gone: every hook command must exit 0 and print nothing.
 	[IO.File]::Move((P $Repo 'hooks' 'guard.py'), (P $Repo 'hooks' 'guard.py.moved'))
-	$out = $deny | & $Exe -NoProfile -Command (Without-Python $ps) 2>$null
+	$out = $deny | Run-Ps (Without-Python $ps) 2>$null
 	Check 'copilot powershell hook without guard or python exits 0' ($LASTEXITCODE -eq 0)
 	Check 'copilot powershell hook without guard or python prints nothing' ($null -eq $out)
 	if (-not $OnWindows) {
@@ -455,7 +459,7 @@ function test_moved_clone_replaces_entry {
 	Check 'moved clone: settings stale' (Has-Line "conflict $s (stale, re-run install)")
 	Check 'moved clone: copilot stale' (Has-Line "conflict $f (stale, re-run install)")
 	Run
-	Check 'moved clone: exactly one kit entry' ((Kit-Hooks).Count -eq 1)
+	Check 'moved clone: exactly one kit entry' (@(Kit-Hooks).Count -eq 1)
 	Check 'moved clone: entry points at new clone' ((Kit-Hooks)[0].command.EndsWith((Guard-Id 'claude')))
 	$d = Read-Json $s
 	Check 'moved clone: foreign entry untouched' ((Canon @($d.hooks.PreToolUse)[0]) -eq (Canon @(($Orig | ConvertFrom-Json).hooks.PreToolUse)[0]))
@@ -474,7 +478,7 @@ function test_claude_settings_merged_once {
 	Run
 	$s = Settings-Path
 	Check 'second run ok line' (Has-Line "ok $s")
-	Check 'exactly one guard entry' ((Kit-Hooks).Count -eq 1)
+	Check 'exactly one guard entry' (@(Kit-Hooks).Count -eq 1)
 	$d = Read-Json $s
 	$o = $Orig | ConvertFrom-Json
 	Check 'key order kept' ((@($d.PSObject.Properties | ForEach-Object { $_.Name }) -join ',') -eq 'model,hooks,env')
@@ -485,7 +489,7 @@ function test_claude_settings_merged_once {
 	Set-Text $s (ConvertTo-Json -InputObject $d -Depth 20)
 	Run
 	Check 'stale entry replaced line' (Has-Line "linked $s")
-	Check 'stale entry replaced, still one' ((Kit-Hooks).Count -eq 1)
+	Check 'stale entry replaced, still one' (@(Kit-Hooks).Count -eq 1)
 	Check 'stale entry now current' (-not ((Kit-Hooks)[0].command.StartsWith('"/old/')))
 }
 
