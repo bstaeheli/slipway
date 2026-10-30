@@ -1,11 +1,11 @@
 ---
-name: adk-build
-description: Build a spec slice by slice after adk-spec, with contracts, code and test lanes, test runs, cross-review and one PR per slice, then the summary. Applies only in projects that have docs/agents/.
+name: slipway-build
+description: Build a spec slice by slice after slipway-spec, with contracts, code and test lanes, test runs, cross-review and one PR per slice, then the summary. Applies only in projects that have docs/agents/.
 ---
 
-# adk-build
+# slipway-build
 
-Follow `~/.claude/rules/adk.md` by heading. The user is not present: stop only for blockers per `## Stopping and blockers`. Input: `docs/agents/specs/<slug>.md` and the slice lines in `docs/agents/status.md`.
+Follow `~/.claude/rules/slipway.md` by heading. The user is not present: stop only for blockers per `## Stopping and blockers`. Input: `docs/agents/specs/<slug>.md` and the slice lines in `docs/agents/status.md`.
 
 ## Steps
 

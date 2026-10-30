@@ -1,8 +1,10 @@
-# Agent development kit
+# slipway
+
+A tool-neutral, spec-driven workflow for coding agents, installed once per machine.
 
 Skills, a rules file and a guard hook that make coding agents (Claude Code, Copilot CLI, VS Code Copilot) work spec-first with contracts, test lanes, review and one PR per slice. Design: [docs/agents/specs/agent-development-kit.md](docs/agents/specs/agent-development-kit.md).
 
-Skills: `adk-bootstrap` (opt a repo in), `adk-brainstorm` (front door), `adk-do-it` (small change), `adk-bugfix` (test-first fix), `adk-spec` (spec and slices), `adk-build` (build slices, PRs, summary).
+Skills: `slipway-bootstrap` (opt a repo in), `slipway-brainstorm` (front door), `slipway-do-it` (small change), `slipway-bugfix` (test-first fix), `slipway-spec` (spec and slices), `slipway-build` (build slices, PRs, summary).
 
 ## Requirements
 
@@ -26,9 +28,9 @@ powershell -ExecutionPolicy Bypass -File .\install.ps1            # also: status
 
 The default execution policy blocks `.\install.ps1`; `-ExecutionPolicy Bypass` applies to this process only and changes no system setting. With PowerShell 7 use `pwsh -ExecutionPolicy Bypass -File .\install.ps1`.
 
-The installer links `skills/*` into `~/.claude/skills` and `~/.agents/skills`, links `rules/adk.md` to `~/.claude/rules/adk.md` and `~/.copilot/instructions/adk.instructions.md`, and registers `hooks/guard.py` as a pre-tool hook in `~/.claude/settings.json` and `~/.copilot/hooks/adk-guard.json`. It never overwrites foreign files: it prints `conflict <path>` and exits 1. Other output lines are `linked`, `copied`, `ok`, `removed`.
+The installer links `skills/*` into `~/.claude/skills` and `~/.agents/skills`, links `rules/slipway.md` to `~/.claude/rules/slipway.md` and `~/.copilot/instructions/slipway.instructions.md`, and registers `hooks/guard.py` as a pre-tool hook in `~/.claude/settings.json` and `~/.copilot/hooks/slipway-guard.json`. It never overwrites foreign files: it prints `conflict <path>` and exits 1. Other output lines are `linked`, `copied`, `ok`, `removed`.
 
-- Before its first change it writes `~/.claude/settings.json.adk-backup`. The merge re-indents settings.json, normalizes number spelling and collapses duplicate keys. Values stay equal; the backup has the original.
+- Before its first change it writes `~/.claude/settings.json.slipway-backup`. The merge re-indents settings.json, normalizes number spelling and collapses duplicate keys. Values stay equal; the backup has the original.
 - Link mode is the default. `--copy` (`install.sh`) or `-Copy` (`install.ps1`) copies instead, marked so it can be removed later; re-run the install after updates.
 - Windows: directories are junctions, the rules file is a symbolic link (needs Developer Mode or elevation), else a marked copy, so re-run install after `git pull`. No hard links.
 - Moved the kit or changed Python: re-run install. Deleting the kit: run uninstall first.
@@ -36,7 +38,7 @@ The installer links `skills/*` into `~/.claude/skills` and `~/.agents/skills`, l
 
 ## Opt in per repo
 
-The kit acts only in repos that have `docs/agents/`. To create it (constitution, status, lessons), type `/adk-bootstrap`; the agent cannot start it by itself. Elsewhere the rules and skills do nothing.
+The kit acts only in repos that have `docs/agents/`. To create it (constitution, status, lessons), type `/slipway-bootstrap`; the agent cannot start it by itself. Elsewhere the rules and skills do nothing.
 
 ## Guard
 
@@ -57,3 +59,7 @@ Not yet verified by hand (checklists in [docs/verification/2026-10-29-tool-behav
 - VS Code: whether it follows symlinked skills, reads the hook in `~/.copilot/hooks/`, and applies the rules file. If skills do not appear, use `--copy` / `-Copy`.
 - VS Code reads both `~/.claude/skills` and `~/.agents/skills`, so each skill may show twice. Harmless; disable one location in VS Code if it bothers you.
 - Windows junctions, the Copilot CLI `powershell` hook key, and whether Claude Code runs hook commands through Git Bash on Windows.
+
+## Credits
+
+The workflow is inspired by Vjekoslav Babić's talk "Ready, Spec, Go! What Could Possibly Go Wrong?" (Directions EMEA 2026, Paris). See [github.com/vjekob](https://github.com/vjekob) and [vjeko.com](https://vjeko.com/).

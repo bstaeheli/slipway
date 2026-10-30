@@ -21,12 +21,12 @@ assert() { # assert <description> <command...>
 setup() {
 	T=$(cd "$(mktemp -d)" && pwd -P)
 	REPO="$T/repo"
-	mkdir -p "$REPO/rules" "$REPO/hooks" "$REPO/skills/adk-a" "$REPO/skills/adk-b"
+	mkdir -p "$REPO/rules" "$REPO/hooks" "$REPO/skills/slipway-a" "$REPO/skills/slipway-b"
 	cp "$SRC/install.sh" "$REPO/"
 	cp "$SRC/hooks/guard.py" "$SRC/hooks/install_hooks.py" "$REPO/hooks/"
-	cp "$SRC/rules/adk.md" "$REPO/rules/"
-	printf 'a\n' >"$REPO/skills/adk-a/SKILL.md"
-	printf 'b\n' >"$REPO/skills/adk-b/SKILL.md"
+	cp "$SRC/rules/slipway.md" "$REPO/rules/"
+	printf 'a\n' >"$REPO/skills/slipway-a/SKILL.md"
+	printf 'b\n' >"$REPO/skills/slipway-b/SKILL.md"
 	HOME="$T/${1:-home}"
 	mkdir -p "$HOME"
 	export HOME
@@ -37,12 +37,12 @@ run() { sh "$REPO/install.sh" "$@" >"$T/out" 2>&1; }
 points_to() { [ -L "$1" ] && [ "$(readlink "$1")" = "$2" ]; }
 
 check_links() {
-	for n in adk-a adk-b; do
+	for n in slipway-a slipway-b; do
 		assert "claude skill $n" points_to "$HOME/.claude/skills/$n" "$REPO/skills/$n"
 		assert "agents skill $n" points_to "$HOME/.agents/skills/$n" "$REPO/skills/$n"
 	done
-	assert "claude rule" points_to "$HOME/.claude/rules/adk.md" "$REPO/rules/adk.md"
-	assert "copilot rule" points_to "$HOME/.copilot/instructions/adk.instructions.md" "$REPO/rules/adk.md"
+	assert "claude rule" points_to "$HOME/.claude/rules/slipway.md" "$REPO/rules/slipway.md"
+	assert "copilot rule" points_to "$HOME/.copilot/instructions/slipway.instructions.md" "$REPO/rules/slipway.md"
 	assert "no copilot skills" test ! -e "$HOME/.copilot/skills"
 }
 
@@ -65,38 +65,38 @@ test_creates_missing_dirs() {
 	assert "HOME empty" test -z "$(ls -A "$HOME")"
 	run
 	assert "install exit 0" test $? -eq 0
-	assert "rules dir created" test -L "$HOME/.claude/rules/adk.md"
+	assert "rules dir created" test -L "$HOME/.claude/rules/slipway.md"
 }
 
 test_conflict_not_overwritten() {
 	setup
-	mkdir -p "$HOME/.claude/skills/adk-spec" "$HOME/.agents/skills/adk-a"
-	printf 'mine\n' >"$HOME/.agents/skills/adk-a/SKILL.md"
-	before=$(cat "$HOME/.agents/skills/adk-a/SKILL.md")
-	ln -s "$T/foreign" "$HOME/.claude/skills/adk-a"
+	mkdir -p "$HOME/.claude/skills/slipway-spec" "$HOME/.agents/skills/slipway-a"
+	printf 'mine\n' >"$HOME/.agents/skills/slipway-a/SKILL.md"
+	before=$(cat "$HOME/.agents/skills/slipway-a/SKILL.md")
+	ln -s "$T/foreign" "$HOME/.claude/skills/slipway-a"
 	rc=0
 	run || rc=$?
 	assert "exit 1" test "$rc" -eq 1
-	assert "conflict printed for dir" grep -qx "conflict $HOME/.agents/skills/adk-a" "$T/out"
-	assert "content intact" test "$(cat "$HOME/.agents/skills/adk-a/SKILL.md")" = "$before"
-	assert "still real dir" test ! -L "$HOME/.agents/skills/adk-a"
-	assert "conflict printed for foreign link" grep -qx "conflict $HOME/.claude/skills/adk-a" "$T/out"
-	assert "foreign link kept" points_to "$HOME/.claude/skills/adk-a" "$T/foreign"
-	assert "others still linked" points_to "$HOME/.claude/skills/adk-b" "$REPO/skills/adk-b"
+	assert "conflict printed for dir" grep -qx "conflict $HOME/.agents/skills/slipway-a" "$T/out"
+	assert "content intact" test "$(cat "$HOME/.agents/skills/slipway-a/SKILL.md")" = "$before"
+	assert "still real dir" test ! -L "$HOME/.agents/skills/slipway-a"
+	assert "conflict printed for foreign link" grep -qx "conflict $HOME/.claude/skills/slipway-a" "$T/out"
+	assert "foreign link kept" points_to "$HOME/.claude/skills/slipway-a" "$T/foreign"
+	assert "others still linked" points_to "$HOME/.claude/skills/slipway-b" "$REPO/skills/slipway-b"
 }
 
 test_prune_stale_link() {
 	setup
 	mkdir -p "$HOME/.claude/skills" "$HOME/.agents/skills/foreign-dir" "$T/repo-other/skills/x"
-	ln -s "$REPO/skills/adk-gone" "$HOME/.claude/skills/adk-gone"
-	ln -s "$REPO/skills/adk-gone" "$HOME/.agents/skills/adk-gone"
+	ln -s "$REPO/skills/slipway-gone" "$HOME/.claude/skills/slipway-gone"
+	ln -s "$REPO/skills/slipway-gone" "$HOME/.agents/skills/slipway-gone"
 	ln -s /nonexistent-foreign "$HOME/.agents/skills/foreign-dangling"
 	ln -s "$T/repo-other/skills/x" "$HOME/.agents/skills/prefix-twin"
 	run
-	assert "removed printed" grep -qx "removed $HOME/.claude/skills/adk-gone" "$T/out"
-	assert "link gone" test ! -L "$HOME/.claude/skills/adk-gone"
-	assert "agents removed printed" grep -qx "removed $HOME/.agents/skills/adk-gone" "$T/out"
-	assert "agents link gone" test ! -L "$HOME/.agents/skills/adk-gone"
+	assert "removed printed" grep -qx "removed $HOME/.claude/skills/slipway-gone" "$T/out"
+	assert "link gone" test ! -L "$HOME/.claude/skills/slipway-gone"
+	assert "agents removed printed" grep -qx "removed $HOME/.agents/skills/slipway-gone" "$T/out"
+	assert "agents link gone" test ! -L "$HOME/.agents/skills/slipway-gone"
 	assert "foreign dir kept" test -d "$HOME/.agents/skills/foreign-dir"
 	assert "foreign dangling link kept" points_to "$HOME/.agents/skills/foreign-dangling" /nonexistent-foreign
 	assert "prefix-sharing link kept" points_to "$HOME/.agents/skills/prefix-twin" "$T/repo-other/skills/x"
@@ -105,24 +105,24 @@ test_prune_stale_link() {
 test_prune_rm_failure() {
 	setup
 	mkdir -p "$HOME/.claude/skills"
-	ln -s "$REPO/skills/adk-gone" "$HOME/.claude/skills/adk-gone"
+	ln -s "$REPO/skills/slipway-gone" "$HOME/.claude/skills/slipway-gone"
 	chmod 555 "$HOME/.claude/skills"
 	rc=0
 	run || rc=$?
 	chmod 755 "$HOME/.claude/skills"
 	assert "rm failure exits nonzero" test "$rc" -ne 0
 	assert "no removed line on rm failure" test "$(grep -c '^removed ' "$T/out")" = 0
-	assert "link still there" test -L "$HOME/.claude/skills/adk-gone"
+	assert "link still there" test -L "$HOME/.claude/skills/slipway-gone"
 }
 
 test_symlinked_repo_path() {
 	setup
 	ln -s "$REPO" "$T/repolink"
 	sh "$T/repolink/install.sh" >"$T/out" 2>&1
-	assert "link uses physical repo path" points_to "$HOME/.claude/skills/adk-a" "$REPO/skills/adk-a"
-	assert "hook uses physical repo path" grep -qF "\"$REPO/hooks/guard.py\\\" --tool copilot" "$HOME/.copilot/hooks/adk-guard.json"
+	assert "link uses physical repo path" points_to "$HOME/.claude/skills/slipway-a" "$REPO/skills/slipway-a"
+	assert "hook uses physical repo path" grep -qF "\"$REPO/hooks/guard.py\\\" --tool copilot" "$HOME/.copilot/hooks/slipway-guard.json"
 	sh "$T/repolink/install.sh" uninstall >"$T/out" 2>&1
-	assert "uninstall via physical path" test ! -L "$HOME/.claude/skills/adk-a"
+	assert "uninstall via physical path" test ! -L "$HOME/.claude/skills/slipway-a"
 }
 
 test_uninstall_keeps_foreign() {
@@ -133,8 +133,8 @@ test_uninstall_keeps_foreign() {
 	run uninstall
 	assert "foreign dir kept" test -d "$HOME/.agents/skills/foreign-dir"
 	assert "foreign link kept" test -L "$HOME/.agents/skills/foreign-link"
-	for p in .claude/skills/adk-a .claude/skills/adk-b .agents/skills/adk-a .agents/skills/adk-b \
-		.claude/rules/adk.md .copilot/instructions/adk.instructions.md; do
+	for p in .claude/skills/slipway-a .claude/skills/slipway-b .agents/skills/slipway-a .agents/skills/slipway-b \
+		.claude/rules/slipway.md .copilot/instructions/slipway.instructions.md; do
 		assert "gone $p" test ! -e "$HOME/$p" -a ! -L "$HOME/$p"
 	done
 }
@@ -158,20 +158,20 @@ test_never_touches_claude_md() {
 test_copy_mode() {
 	setup
 	run --copy
-	assert "copied printed" grep -q "^copied $HOME/.claude/skills/adk-a" "$T/out"
-	for d in .claude/skills/adk-a .agents/skills/adk-b; do
+	assert "copied printed" grep -q "^copied $HOME/.claude/skills/slipway-a" "$T/out"
+	for d in .claude/skills/slipway-a .agents/skills/slipway-b; do
 		assert "real dir $d" test -d "$HOME/$d" -a ! -L "$HOME/$d"
-		assert "marker $d" test -f "$HOME/$d/.adk-installed"
+		assert "marker $d" test -f "$HOME/$d/.slipway-installed"
 	done
-	assert "rule is real file" test -f "$HOME/.claude/rules/adk.md" -a ! -L "$HOME/.claude/rules/adk.md"
-	assert "rule marker" grep -qxF "<!-- adk-installed -->" "$HOME/.claude/rules/adk.md"
-	printf 'b2\n' >"$REPO/skills/adk-b/SKILL.md"
+	assert "rule is real file" test -f "$HOME/.claude/rules/slipway.md" -a ! -L "$HOME/.claude/rules/slipway.md"
+	assert "rule marker" grep -qxF "<!-- slipway-installed -->" "$HOME/.claude/rules/slipway.md"
+	printf 'b2\n' >"$REPO/skills/slipway-b/SKILL.md"
 	rc=0
 	run --copy || rc=$?
 	assert "refresh exit 0" test "$rc" -eq 0
-	assert "refreshed content" test "$(cat "$HOME/.agents/skills/adk-b/SKILL.md")" = b2
+	assert "refreshed content" test "$(cat "$HOME/.agents/skills/slipway-b/SKILL.md")" = b2
 	run uninstall
-	assert "copies removed" test ! -e "$HOME/.claude/skills/adk-a" -a ! -e "$HOME/.agents/skills/adk-b" -a ! -e "$HOME/.claude/rules/adk.md"
+	assert "copies removed" test ! -e "$HOME/.claude/skills/slipway-a" -a ! -e "$HOME/.agents/skills/slipway-b" -a ! -e "$HOME/.claude/rules/slipway.md"
 }
 
 # frontmatter <file>: lines between the opening and closing --- (empty if none).
@@ -182,12 +182,12 @@ after_frontmatter() { awk 'p { print; exit } NR > 1 && $0 == "---" { p = 1 }' "$
 
 test_copy_mode_keeps_frontmatter() {
 	setup
-	f="$HOME/.copilot/instructions/adk.instructions.md"
+	f="$HOME/.copilot/instructions/slipway.instructions.md"
 	run --copy
 	assert "starts with ---" test "$(head -n1 "$f")" = "---"
 	assert "applyTo in frontmatter" fm_has "$f" '^applyTo:'
-	assert "marker right after frontmatter" test "$(after_frontmatter "$f")" = "<!-- adk-installed -->"
-	assert "marker not in frontmatter" test "$(frontmatter "$f" | grep -c adk-installed)" = 0
+	assert "marker right after frontmatter" test "$(after_frontmatter "$f")" = "<!-- slipway-installed -->"
+	assert "marker not in frontmatter" test "$(frontmatter "$f" | grep -c slipway-installed)" = 0
 	rc=0
 	run --copy || rc=$?
 	assert "re-run exit 0" test "$rc" -eq 0
@@ -198,9 +198,9 @@ test_copy_mode_keeps_frontmatter() {
 	{ seq 1 30; cat "$f"; } >"$T/shifted" && mv "$T/shifted" "$f"
 	run uninstall
 	assert "marker past line 20 still kit-owned" test ! -e "$f"
-	printf 'plain\n' >"$REPO/rules/adk.md"
+	printf 'plain\n' >"$REPO/rules/slipway.md"
 	run --copy
-	assert "no frontmatter: marker on line 1" test "$(head -n1 "$f")" = "<!-- adk-installed -->"
+	assert "no frontmatter: marker on line 1" test "$(head -n1 "$f")" = "<!-- slipway-installed -->"
 }
 
 # jget <json file> <python expression over d> [args...]: print the expression (extra args in sys.argv[3:]).
@@ -214,7 +214,7 @@ ORIG='{"model": "opus", "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{
 test_hooks_written() {
 	setup
 	run
-	f="$HOME/.copilot/hooks/adk-guard.json"
+	f="$HOME/.copilot/hooks/slipway-guard.json"
 	s="$HOME/.claude/settings.json"
 	assert "copilot hook linked line" grep -qx "linked $f" "$T/out"
 	# Expressions go through a variable: bash 3.2 mis-parses braces inside nested $(...).
@@ -223,7 +223,7 @@ test_hooks_written() {
 	assert "settings linked line" grep -qx "linked $s" "$T/out"
 	want="d == {'hooks': {'PreToolUse': [{'matcher': 'Bash|PowerShell', 'hooks': [{'type': 'command', 'command': sys.argv[3]}]}]}}"
 	assert "settings entry" test "$(jget "$s" "$want" "$(guard_cmd)")" = True
-	assert "no backup without prior settings" test ! -e "$s.adk-backup"
+	assert "no backup without prior settings" test ! -e "$s.slipway-backup"
 	run uninstall
 	assert "kit-created settings left empty" test "$(jget "$s" "d")" = "{}"
 }
@@ -236,7 +236,7 @@ test_hook_commands_run() {
 	proj="$T/proj"
 	mkdir -p "$proj/docs/agents"
 	c=$(jget "$HOME/.claude/settings.json" "d['hooks']['PreToolUse'][0]['hooks'][0]['command']")
-	b=$(jget "$HOME/.copilot/hooks/adk-guard.json" "d['hooks']['preToolUse'][0]['bash']")
+	b=$(jget "$HOME/.copilot/hooks/slipway-guard.json" "d['hooks']['preToolUse'][0]['bash']")
 	rc=0
 	printf '{"cwd": "%s", "tool_input": {"command": "cargo publish"}}' "$proj" | sh -c "$c" 2>/dev/null || rc=$?
 	assert "claude hook denies publish (exit 2)" test "$rc" -eq 2
@@ -269,14 +269,14 @@ test_moved_clone_replaces_entry() {
 	run status || rc=$?
 	assert "moved clone: status exit 1" test "$rc" -eq 1
 	assert "moved clone: settings stale" grep -qx "conflict $s (stale, re-run install)" "$T/out"
-	assert "moved clone: copilot stale" grep -qx "conflict $HOME/.copilot/hooks/adk-guard.json (stale, re-run install)" "$T/out"
+	assert "moved clone: copilot stale" grep -qx "conflict $HOME/.copilot/hooks/slipway-guard.json (stale, re-run install)" "$T/out"
 	run
 	assert "moved clone: exactly one kit entry" test "$(kit_count "$s")" = 1
 	assert "moved clone: entry points at new clone" test "$(jget "$s" "d['hooks']['PreToolUse'][-1]['hooks'][0]['command']")" = "$(guard_cmd)"
 	assert "moved clone: foreign entry untouched" test "$(jget "$s" "d['hooks']['PreToolUse'][0] == json.loads(sys.argv[3])['hooks']['PreToolUse'][0]" "$ORIG")" = True
 	run status
 	assert "moved clone: settings ok after install" grep -qx "ok $s" "$T/out"
-	assert "moved clone: copilot ok after install" grep -qx "ok $HOME/.copilot/hooks/adk-guard.json" "$T/out"
+	assert "moved clone: copilot ok after install" grep -qx "ok $HOME/.copilot/hooks/slipway-guard.json" "$T/out"
 	# The kit entry is recognised whatever clone wrote it, so uninstall from the old clone removes it.
 	REPO=$old
 	run uninstall
@@ -311,17 +311,17 @@ test_backup_created() {
 	mkdir -p "$HOME/.claude"
 	printf '{"model": "opus"}\n' >"$s"
 	run
-	assert "backup is original" test "$(cat "$s.adk-backup")" = '{"model": "opus"}'
+	assert "backup is original" test "$(cat "$s.slipway-backup")" = '{"model": "opus"}'
 	run uninstall
 	printf '{"model": "sonnet"}\n' >"$s"
 	run
-	assert "backup never overwritten" test "$(cat "$s.adk-backup")" = '{"model": "opus"}'
+	assert "backup never overwritten" test "$(cat "$s.slipway-backup")" = '{"model": "opus"}'
 }
 
 test_uninstall_removes_only_guard_entry() {
 	setup
 	s="$HOME/.claude/settings.json"
-	f="$HOME/.copilot/hooks/adk-guard.json"
+	f="$HOME/.copilot/hooks/slipway-guard.json"
 	mkdir -p "$HOME/.claude" "$HOME/.copilot/hooks"
 	printf '%s\n' "$ORIG" >"$s"
 	printf '{}\n' >"$HOME/.copilot/hooks/mine.json"
@@ -346,8 +346,8 @@ test_invalid_settings_json() {
 	assert "invalid json exit 1" test "$rc" -eq 1
 	assert "invalid json conflict line" grep -qx "conflict $s (invalid JSON)" "$T/out"
 	assert "invalid json untouched" test "$(cat "$s")" = '{not json'
-	assert "invalid json no backup" test ! -e "$s.adk-backup"
-	assert "copilot hook still written" test -f "$HOME/.copilot/hooks/adk-guard.json"
+	assert "invalid json no backup" test ! -e "$s.slipway-backup"
+	assert "copilot hook still written" test -f "$HOME/.copilot/hooks/slipway-guard.json"
 	check_links
 }
 
@@ -359,7 +359,7 @@ test_missing_python() {
 	PATH="$T/bin" "$SH" "$REPO/install.sh" >"$T/out" 2>&1 || rc=$?
 	assert "no python exit 1" test "$rc" -eq 1
 	assert "no python conflict line" grep -qx "conflict hooks (python 3 not found)" "$T/out"
-	assert "no python: no copilot hook" test ! -e "$HOME/.copilot/hooks/adk-guard.json"
+	assert "no python: no copilot hook" test ! -e "$HOME/.copilot/hooks/slipway-guard.json"
 	assert "no python: no settings" test ! -e "$HOME/.claude/settings.json"
 	check_links
 }
@@ -368,7 +368,7 @@ test_status_hooks() {
 	setup
 	run
 	run status
-	assert "status copilot hook" grep -qx "ok $HOME/.copilot/hooks/adk-guard.json" "$T/out"
+	assert "status copilot hook" grep -qx "ok $HOME/.copilot/hooks/slipway-guard.json" "$T/out"
 	assert "status settings" grep -qx "ok $HOME/.claude/settings.json" "$T/out"
 }
 
@@ -394,7 +394,7 @@ test_unexpected_hooks_structure() {
 	assert "structure exit 1" test "$rc" -eq 1
 	assert "structure conflict line" grep -qx "conflict $s (unexpected hooks structure)" "$T/out"
 	assert "structure untouched" test "$(cat "$s")" = '{"hooks": []}'
-	assert "structure no backup" test ! -e "$s.adk-backup"
+	assert "structure no backup" test ! -e "$s.slipway-backup"
 }
 
 test_bom_settings() {
@@ -412,7 +412,7 @@ test_bom_settings() {
 test_status_stale_copilot_hook() {
 	setup
 	run
-	f="$HOME/.copilot/hooks/adk-guard.json"
+	f="$HOME/.copilot/hooks/slipway-guard.json"
 	printf '{}\n' >"$f"
 	rc=0
 	run status || rc=$?

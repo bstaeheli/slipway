@@ -26,7 +26,7 @@ def write(path, text):
     """Atomic write through symlinks, UTF-8 without BOM, keeping an existing file's mode."""
     real = os.path.realpath(path)
     os.makedirs(os.path.dirname(real), exist_ok=True)
-    tmp = real + ".adk-tmp"
+    tmp = real + ".slipway-tmp"
     with open(tmp, "w", encoding="utf-8", newline="\n") as f:
         f.write(text)
     if os.path.exists(real):
@@ -117,7 +117,7 @@ def settings(act, path, cmd):
         hooks.pop("PreToolUse", None)
         if not hooks:
             del data["hooks"]
-    backup = path + ".adk-backup"
+    backup = path + ".slipway-backup"
     if exists and not os.path.exists(backup):
         shutil.copy2(path, backup)
     write(path, json.dumps(data, indent=2, ensure_ascii=False) + "\n")

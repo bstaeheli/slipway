@@ -1,12 +1,12 @@
 ---
-name: adk-bootstrap
+name: slipway-bootstrap
 description: Bootstrap a project into the agent development kit. Opts the project in by creating docs/agents/ from templates. Use only when the user asks to bootstrap or opt in.
 disable-model-invocation: true
 ---
 
-# adk-bootstrap
+# slipway-bootstrap
 
-Opt this repo into the kit. Follow `~/.claude/rules/adk.md` (`## Opt-in`, `## Permissions and environments`, `## Git platforms`) by name; do not restate it.
+Opt this repo into the kit. Follow `~/.claude/rules/slipway.md` (`## Opt-in`, `## Permissions and environments`, `## Git platforms`) by name; do not restate it.
 
 ## Steps
 

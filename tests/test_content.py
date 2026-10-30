@@ -5,9 +5,9 @@ import unittest
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RULES = ROOT / "rules" / "adk.md"
+RULES = ROOT / "rules" / "slipway.md"
 TEMPLATES = ROOT / "templates" / "permissions"
-BOOT = ROOT / "skills" / "adk-bootstrap"
+BOOT = ROOT / "skills" / "slipway-bootstrap"
 sys.path.insert(0, str(ROOT / "hooks"))
 from guard import PUBLISH_OR_REMOTE_DELETE  # noqa: E402
 
@@ -40,8 +40,8 @@ class RulesTest(unittest.TestCase):
         body = section(str(RULES), "Opt-in")
         self.assertIn("docs/agents/", body)
         self.assertIn("do nothing", body)
-        # adk-bootstrap has disable-model-invocation, so the agent cannot run it itself.
-        self.assertIn("tell the user to type `/adk-bootstrap`", body)
+        # slipway-bootstrap has disable-model-invocation, so the agent cannot run it itself.
+        self.assertIn("tell the user to type `/slipway-bootstrap`", body)
 
     def test_headings_in_order(self):
         self.assertEqual(re.findall(r"^## (.+)$", self.text, re.M), HEADINGS)
@@ -57,7 +57,7 @@ class RulesTest(unittest.TestCase):
 
     def test_precedence_names_kit_skills(self):
         body = section(str(RULES), "Precedence")
-        self.assertIn("adk-", body)
+        self.assertIn("slipway-", body)
         self.assertIn("take precedence", body)
         self.assertIn("docs/agents/", body)
 
@@ -184,7 +184,7 @@ class BootstrapTest(unittest.TestCase):
 
 
 class FrontEndSkillsTest(unittest.TestCase):
-    NAMES = ["adk-brainstorm", "adk-do-it", "adk-bugfix"]
+    NAMES = ["slipway-brainstorm", "slipway-do-it", "slipway-bugfix"]
 
     def skill(self, name):
         return (ROOT / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
@@ -202,7 +202,7 @@ class FrontEndSkillsTest(unittest.TestCase):
                         for l in section(str(RULES), h).splitlines() if l.startswith("- ")]
         for n in self.NAMES:
             t = self.skill(n)
-            self.assertIn("~/.claude/rules/adk.md", t, n)
+            self.assertIn("~/.claude/rules/slipway.md", t, n)
             for p in prohibitions:
                 self.assertNotIn(p, t, n)
         for n in self.NAMES[1:]:
@@ -225,40 +225,40 @@ class FrontEndSkillsTest(unittest.TestCase):
         self.assertGreater(cited, 0)
 
     def test_give_up_rule(self):
-        for n in ["adk-do-it", "adk-bugfix"]:
+        for n in ["slipway-do-it", "slipway-bugfix"]:
             t = self.skill(n)
             self.assertIn("3 attempts", t, n)
             self.assertIn("blocker", t.lower(), n)
             self.assertIn("docs/agents/status.md", t, n)
 
     def test_brainstorm(self):
-        t = self.skill("adk-brainstorm")
+        t = self.skill("slipway-brainstorm")
         low = t.lower()
         self.assertIn("docs/agents/brainstorm/<slug>.md", t)
         self.assertIn("lessons.md", t)
         self.assertIn("constitution", low)
-        for r in ["adk-do-it", "adk-bugfix", "adk-spec"]:
+        for r in ["slipway-do-it", "slipway-bugfix", "slipway-spec"]:
             self.assertIn(r, t)
         for w in ["one question", "problem", "assumption", "alternative", "contradiction", "resume",
                   "architecture", "business logic", "in order"]:
             self.assertIn(w, low, w)
 
     def test_do_it(self):
-        t = self.skill("adk-do-it")
+        t = self.skill("slipway-do-it")
         low = t.lower()
         self.assertIn("no spec", low)
         for w in ["what changed", "tests run", "decisions", "escalat"]:
             self.assertIn(w, low, w)
 
     def test_bugfix(self):
-        t = self.skill("adk-bugfix")
+        t = self.skill("slipway-bugfix")
         low = t.lower()
         self.assertLess(low.index("reproduction test"), low.index("fix the cause"))
         for w in ["fails", "passes", "never alter", "what changed", "tests run", "decisions", "escalat"]:
             self.assertIn(w, low, w)
 
 
-SPEC = ROOT / "skills" / "adk-spec"
+SPEC = ROOT / "skills" / "slipway-spec"
 
 
 class SpecSkillTest(unittest.TestCase):
@@ -267,7 +267,7 @@ class SpecSkillTest(unittest.TestCase):
         self.low = self.text.lower()
 
     def test_frontmatter(self):
-        self.assertRegex(self.text, r"(?m)^name: adk-spec$")
+        self.assertRegex(self.text, r"(?m)^name: slipway-spec$")
         desc = re.search(r"^description: (.+)$", self.text, re.M).group(1)
         self.assertIn("docs/agents/", desc)
         self.assertNotIn("disable-model-invocation", self.text)
@@ -282,7 +282,7 @@ class SpecSkillTest(unittest.TestCase):
 
     def test_output_contract(self):
         for s in ["docs/agents/specs/<slug>.md", "templates/spec.md", "docs/agents/status.md",
-                  "## Active", "- [ ] <slug>/S<n>: <title>", "adk-build"]:
+                  "## Active", "- [ ] <slug>/S<n>: <title>", "slipway-build"]:
             self.assertIn(s, self.text, s)
 
     def test_spec_content(self):
@@ -321,7 +321,7 @@ class SpecSkillTest(unittest.TestCase):
             self.assertNotIn(p, self.text)
 
 
-BUILD = ROOT / "skills" / "adk-build" / "SKILL.md"
+BUILD = ROOT / "skills" / "slipway-build" / "SKILL.md"
 
 
 class BuildSkillTest(unittest.TestCase):
@@ -330,7 +330,7 @@ class BuildSkillTest(unittest.TestCase):
         self.low = self.text.lower()
 
     def test_frontmatter(self):
-        self.assertRegex(self.text, r"(?m)^name: adk-build$")
+        self.assertRegex(self.text, r"(?m)^name: slipway-build$")
         desc = re.search(r"^description: (.+)$", self.text, re.M).group(1)
         self.assertIn("docs/agents/", desc)
         self.assertNotIn("disable-model-invocation", self.text)
@@ -454,19 +454,19 @@ class DocsTest(unittest.TestCase):
                 self.assertIn(tool, body, f"{head}: {tool}")
 
     def test_readme_terms(self):
-        for w in ("install.sh", "install.ps1", "uninstall", "git pull", "adk-bootstrap",
-                  "docs/agents/", "Python 3.9", "--copy", "-Copy", "adk-backup",
+        for w in ("install.sh", "install.ps1", "uninstall", "git pull", "slipway-bootstrap",
+                  "docs/agents/", "Python 3.9", "--copy", "-Copy", "slipway-backup",
                   "docs/platforms.md", "2026-10-29-tool-behavior.md", "-ExecutionPolicy Bypass"):
             self.assertIn(w, self.readme, w)
-        self.assertIn("type `/adk-bootstrap`", self.readme)
+        self.assertIn("type `/slipway-bootstrap`", self.readme)
         self.assertIn("Moved the kit or changed Python: re-run install. Deleting the kit: run uninstall first.", self.readme)
 
     def test_skills_reference_installed_rules_path(self):
-        # A bare `rules/adk.md` resolves against the user's repo, where it does not exist.
+        # A bare `rules/slipway.md` resolves against the user's repo, where it does not exist.
         for f in sorted((ROOT / "skills").glob("*/SKILL.md")):
             t = f.read_text(encoding="utf-8")
-            self.assertIn("Follow `~/.claude/rules/adk.md`", t, f.parent.name)
-            self.assertNotIn("Follow `rules/adk.md`", t, f.parent.name)
+            self.assertIn("Follow `~/.claude/rules/slipway.md`", t, f.parent.name)
+            self.assertNotIn("Follow `rules/slipway.md`", t, f.parent.name)
 
     def test_no_em_dash_or_token(self):
         for t in (self.plat, self.readme):

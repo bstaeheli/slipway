@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Continue'
 $Src = Split-Path -Parent $PSScriptRoot
 $Exe = (Get-Process -Id $PID).Path
 $OnWindows = $env:OS -eq 'Windows_NT'
-$Mark = '<!-- adk-installed -->'
+$Mark = '<!-- slipway-installed -->'
 $script:Fails = 0
 $script:Cases = 0
 
@@ -25,19 +25,19 @@ function Setup([string]$homeName = 'home') {
 	$base = [IO.Path]::GetTempPath()
 	# GitHub Windows runners expose TEMP as an 8.3 short path; RUNNER_TEMP is a long path.
 	if ($env:RUNNER_TEMP) { $base = $env:RUNNER_TEMP }
-	$t = P $base ('adk-test-' + [guid]::NewGuid().ToString('N'))
+	$t = P $base ('slipway-test-' + [guid]::NewGuid().ToString('N'))
 	[void](New-Item -ItemType Directory -Path $t)
 	$script:T = Real $t
 	$script:Repo = P $script:T 'repo'
-	foreach ($d in 'rules', 'hooks', (P 'skills' 'adk-a'), (P 'skills' 'adk-b')) {
+	foreach ($d in 'rules', 'hooks', (P 'skills' 'slipway-a'), (P 'skills' 'slipway-b')) {
 		[void](New-Item -ItemType Directory -Force -Path (P $script:Repo $d))
 	}
 	Copy-Item -LiteralPath (P $Src 'install.ps1') -Destination $script:Repo
-	Copy-Item -LiteralPath (P $Src 'rules' 'adk.md') -Destination (P $script:Repo 'rules')
+	Copy-Item -LiteralPath (P $Src 'rules' 'slipway.md') -Destination (P $script:Repo 'rules')
 	Copy-Item -LiteralPath (P $Src 'hooks' 'guard.py') -Destination (P $script:Repo 'hooks')
 	Copy-Item -LiteralPath (P $Src 'hooks' 'install_hooks.py') -Destination (P $script:Repo 'hooks')
-	Set-Text (P $script:Repo 'skills' 'adk-a' 'SKILL.md') "a`n"
-	Set-Text (P $script:Repo 'skills' 'adk-b' 'SKILL.md') "b`n"
+	Set-Text (P $script:Repo 'skills' 'slipway-a' 'SKILL.md') "a`n"
+	Set-Text (P $script:Repo 'skills' 'slipway-b' 'SKILL.md') "b`n"
 	$script:H = P $script:T $homeName
 	[void](New-Item -ItemType Directory -Path $script:H)
 }
@@ -78,12 +78,12 @@ function New-Dangling([string]$link, [string]$target) {
 }
 
 function Check-Links {
-	foreach ($n in 'adk-a', 'adk-b') {
+	foreach ($n in 'slipway-a', 'slipway-b') {
 		Check "claude skill $n" (Points-To (P $H '.claude' 'skills' $n) (P $Repo 'skills' $n))
 		Check "agents skill $n" (Points-To (P $H '.agents' 'skills' $n) (P $Repo 'skills' $n))
 	}
-	Check 'claude rule' (Points-To (P $H '.claude' 'rules' 'adk.md') (P $Repo 'rules' 'adk.md'))
-	Check 'copilot rule' (Points-To (P $H '.copilot' 'instructions' 'adk.instructions.md') (P $Repo 'rules' 'adk.md'))
+	Check 'claude rule' (Points-To (P $H '.claude' 'rules' 'slipway.md') (P $Repo 'rules' 'slipway.md'))
+	Check 'copilot rule' (Points-To (P $H '.copilot' 'instructions' 'slipway.instructions.md') (P $Repo 'rules' 'slipway.md'))
 	Check 'no copilot skills' (-not (Exists (P $H '.copilot' 'skills')))
 }
 
@@ -106,26 +106,26 @@ function test_creates_missing_dirs {
 	Check 'HOME empty' (@(Get-ChildItem -LiteralPath $H -Force).Count -eq 0)
 	Run
 	Check 'install exit 0' ($Rc -eq 0)
-	Check 'rules dir created' (Is-Link (P $H '.claude' 'rules' 'adk.md'))
+	Check 'rules dir created' (Is-Link (P $H '.claude' 'rules' 'slipway.md'))
 }
 
 function test_conflict_not_overwritten {
 	Setup
-	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude' 'skills' 'adk-spec'))
-	[void](New-Item -ItemType Directory -Force -Path (P $H '.agents' 'skills' 'adk-a'))
-	$f = P $H '.agents' 'skills' 'adk-a' 'SKILL.md'
+	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude' 'skills' 'slipway-spec'))
+	[void](New-Item -ItemType Directory -Force -Path (P $H '.agents' 'skills' 'slipway-a'))
+	$f = P $H '.agents' 'skills' 'slipway-a' 'SKILL.md'
 	Set-Text $f "mine`n"
 	$foreign = P $T 'foreign'
 	[void](New-Item -ItemType Directory -Path $foreign)
-	New-DirLink (P $H '.claude' 'skills' 'adk-a') $foreign
+	New-DirLink (P $H '.claude' 'skills' 'slipway-a') $foreign
 	Run
 	Check 'exit 1' ($Rc -eq 1)
-	Check 'conflict printed for dir' (Has-Line ('conflict ' + (P $H '.agents' 'skills' 'adk-a')))
+	Check 'conflict printed for dir' (Has-Line ('conflict ' + (P $H '.agents' 'skills' 'slipway-a')))
 	Check 'content intact' ((Get-Text $f) -eq "mine`n")
-	Check 'still real dir' (-not (Is-Link (P $H '.agents' 'skills' 'adk-a')))
-	Check 'conflict printed for foreign link' (Has-Line ('conflict ' + (P $H '.claude' 'skills' 'adk-a')))
-	Check 'foreign link kept' (Points-To (P $H '.claude' 'skills' 'adk-a') $foreign)
-	Check 'others still linked' (Points-To (P $H '.claude' 'skills' 'adk-b') (P $Repo 'skills' 'adk-b'))
+	Check 'still real dir' (-not (Is-Link (P $H '.agents' 'skills' 'slipway-a')))
+	Check 'conflict printed for foreign link' (Has-Line ('conflict ' + (P $H '.claude' 'skills' 'slipway-a')))
+	Check 'foreign link kept' (Points-To (P $H '.claude' 'skills' 'slipway-a') $foreign)
+	Check 'others still linked' (Points-To (P $H '.claude' 'skills' 'slipway-b') (P $Repo 'skills' 'slipway-b'))
 }
 
 function test_prune_stale_link {
@@ -133,20 +133,20 @@ function test_prune_stale_link {
 	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude' 'skills'))
 	[void](New-Item -ItemType Directory -Force -Path (P $H '.agents' 'skills' 'foreign-dir'))
 	[void](New-Item -ItemType Directory -Force -Path (P $T 'repo-other' 'skills' 'x'))
-	$gone = P $Repo 'skills' 'adk-gone'
+	$gone = P $Repo 'skills' 'slipway-gone'
 	[void](New-Item -ItemType Directory -Path $gone)
-	New-DirLink (P $H '.claude' 'skills' 'adk-gone') $gone
-	New-DirLink (P $H '.agents' 'skills' 'adk-gone') $gone
+	New-DirLink (P $H '.claude' 'skills' 'slipway-gone') $gone
+	New-DirLink (P $H '.agents' 'skills' 'slipway-gone') $gone
 	[IO.Directory]::Delete($gone)
 	$dangling = P $T 'foreign-gone'
 	New-Dangling (P $H '.agents' 'skills' 'foreign-dangling') $dangling
 	$twin = P $T 'repo-other' 'skills' 'x'
 	New-DirLink (P $H '.agents' 'skills' 'prefix-twin') $twin
 	Run
-	Check 'removed printed' (Has-Line ('removed ' + (P $H '.claude' 'skills' 'adk-gone')))
-	Check 'link gone' (-not (Exists (P $H '.claude' 'skills' 'adk-gone')))
-	Check 'agents removed printed' (Has-Line ('removed ' + (P $H '.agents' 'skills' 'adk-gone')))
-	Check 'agents link gone' (-not (Exists (P $H '.agents' 'skills' 'adk-gone')))
+	Check 'removed printed' (Has-Line ('removed ' + (P $H '.claude' 'skills' 'slipway-gone')))
+	Check 'link gone' (-not (Exists (P $H '.claude' 'skills' 'slipway-gone')))
+	Check 'agents removed printed' (Has-Line ('removed ' + (P $H '.agents' 'skills' 'slipway-gone')))
+	Check 'agents link gone' (-not (Exists (P $H '.agents' 'skills' 'slipway-gone')))
 	Check 'foreign dir kept' (Test-Path -LiteralPath (P $H '.agents' 'skills' 'foreign-dir') -PathType Container)
 	Check 'foreign dangling link kept' (Points-To (P $H '.agents' 'skills' 'foreign-dangling') $dangling)
 	Check 'prefix-sharing link kept' (Points-To (P $H '.agents' 'skills' 'prefix-twin') $twin)
@@ -155,9 +155,9 @@ function test_prune_stale_link {
 function test_prune_rm_failure {
 	Setup
 	$dir = P $H '.claude' 'skills'
-	$link = P $dir 'adk-gone'
+	$link = P $dir 'slipway-gone'
 	[void](New-Item -ItemType Directory -Force -Path $dir)
-	$gone = P $Repo 'skills' 'adk-gone'
+	$gone = P $Repo 'skills' 'slipway-gone'
 	[void](New-Item -ItemType Directory -Path $gone)
 	New-DirLink $link $gone
 	[IO.Directory]::Delete($gone)
@@ -185,10 +185,10 @@ function test_symlinked_repo_path {
 	$rl = P $T 'repolink'
 	New-DirLink $rl $Repo
 	Run-Script (P $rl 'install.ps1')
-	Check 'link uses physical repo path' (Points-To (P $H '.claude' 'skills' 'adk-a') (P $Repo 'skills' 'adk-a'))
+	Check 'link uses physical repo path' (Points-To (P $H '.claude' 'skills' 'slipway-a') (P $Repo 'skills' 'slipway-a'))
 	Check 'hook uses physical repo path' ((Copilot-Hook).bash.EndsWith((Guard-Id 'copilot') + ' || true'))
 	Run-Script (P $rl 'install.ps1') uninstall
-	Check 'uninstall via physical path' (-not (Exists (P $H '.claude' 'skills' 'adk-a')))
+	Check 'uninstall via physical path' (-not (Exists (P $H '.claude' 'skills' 'slipway-a')))
 }
 
 function test_uninstall_keeps_foreign {
@@ -199,8 +199,8 @@ function test_uninstall_keeps_foreign {
 	Run uninstall
 	Check 'foreign dir kept' (Test-Path -LiteralPath (P $H '.agents' 'skills' 'foreign-dir') -PathType Container)
 	Check 'foreign link kept' (Is-Link (P $H '.agents' 'skills' 'foreign-link'))
-	foreach ($p in (P '.claude' 'skills' 'adk-a'), (P '.claude' 'skills' 'adk-b'), (P '.agents' 'skills' 'adk-a'),
-		(P '.agents' 'skills' 'adk-b'), (P '.claude' 'rules' 'adk.md'), (P '.copilot' 'instructions' 'adk.instructions.md')) {
+	foreach ($p in (P '.claude' 'skills' 'slipway-a'), (P '.claude' 'skills' 'slipway-b'), (P '.agents' 'skills' 'slipway-a'),
+		(P '.agents' 'skills' 'slipway-b'), (P '.claude' 'rules' 'slipway.md'), (P '.copilot' 'instructions' 'slipway.instructions.md')) {
 		Check "gone $p" (-not (Exists (P $H $p)))
 	}
 }
@@ -225,26 +225,26 @@ function test_never_touches_claude_md {
 function test_copy_mode {
 	Setup
 	Run -Copy
-	Check 'copied printed' (Has-Line ('copied ' + (P $H '.claude' 'skills' 'adk-a')))
-	foreach ($d in (P '.claude' 'skills' 'adk-a'), (P '.agents' 'skills' 'adk-b')) {
+	Check 'copied printed' (Has-Line ('copied ' + (P $H '.claude' 'skills' 'slipway-a')))
+	foreach ($d in (P '.claude' 'skills' 'slipway-a'), (P '.agents' 'skills' 'slipway-b')) {
 		Check "real dir $d" ((Test-Path -LiteralPath (P $H $d) -PathType Container) -and -not (Is-Link (P $H $d)))
-		Check "marker $d" (Test-Path -LiteralPath (P $H $d '.adk-installed') -PathType Leaf)
+		Check "marker $d" (Test-Path -LiteralPath (P $H $d '.slipway-installed') -PathType Leaf)
 	}
-	$rule = P $H '.claude' 'rules' 'adk.md'
+	$rule = P $H '.claude' 'rules' 'slipway.md'
 	Check 'rule is real file' ((Test-Path -LiteralPath $rule -PathType Leaf) -and -not (Is-Link $rule))
 	Check 'rule marker' (@(Get-Content -LiteralPath $rule) -contains $Mark)
-	Set-Text (P $Repo 'skills' 'adk-b' 'SKILL.md') "b2`n"
+	Set-Text (P $Repo 'skills' 'slipway-b' 'SKILL.md') "b2`n"
 	Run -Copy
 	Check 'refresh exit 0' ($Rc -eq 0)
 	Check 'refresh prints no removed line' (@($Out | Where-Object { $_ -like 'removed *' }).Count -eq 0)
-	Check 'refreshed content' ((Get-Text (P $H '.agents' 'skills' 'adk-b' 'SKILL.md')) -eq "b2`n")
+	Check 'refreshed content' ((Get-Text (P $H '.agents' 'skills' 'slipway-b' 'SKILL.md')) -eq "b2`n")
 	Run uninstall
-	Check 'copies removed' (-not ((Exists (P $H '.claude' 'skills' 'adk-a')) -or (Exists (P $H '.agents' 'skills' 'adk-b')) -or (Exists $rule)))
+	Check 'copies removed' (-not ((Exists (P $H '.claude' 'skills' 'slipway-a')) -or (Exists (P $H '.agents' 'skills' 'slipway-b')) -or (Exists $rule)))
 }
 
 function test_copy_mode_keeps_frontmatter {
 	Setup
-	$f = P $H '.copilot' 'instructions' 'adk.instructions.md'
+	$f = P $H '.copilot' 'instructions' 'slipway.instructions.md'
 	Run -Copy
 	$lines = @(Get-Content -LiteralPath $f)
 	$close = -1
@@ -252,7 +252,7 @@ function test_copy_mode_keeps_frontmatter {
 	Check 'starts with ---' ($lines[0] -eq '---')
 	Check 'applyTo in frontmatter' ($close -gt 0 -and @($lines[1..($close - 1)] | Where-Object { $_ -like 'applyTo:*' }).Count -gt 0)
 	Check 'marker right after frontmatter' ($close -gt 0 -and $lines[$close + 1] -eq $Mark)
-	Check 'marker not in frontmatter' ($close -gt 0 -and @($lines[0..$close] | Where-Object { $_ -like '*adk-installed*' }).Count -eq 0)
+	Check 'marker not in frontmatter' ($close -gt 0 -and @($lines[0..$close] | Where-Object { $_ -like '*slipway-installed*' }).Count -eq 0)
 	Run -Copy
 	Check 're-run exit 0' ($Rc -eq 0)
 	Check 're-run recognizes copy' (Has-Line "copied $f")
@@ -262,18 +262,18 @@ function test_copy_mode_keeps_frontmatter {
 	Set-Text $f (((1..30) -join "`n") + "`n" + (Get-Text $f))
 	Run uninstall
 	Check 'marker past line 20 still kit-owned' (-not (Exists $f))
-	Set-Text (P $Repo 'rules' 'adk.md') "plain`n"
+	Set-Text (P $Repo 'rules' 'slipway.md') "plain`n"
 	Run -Copy
 	Check 'no frontmatter: marker on line 1' (@(Get-Content -LiteralPath $f)[0] -eq $Mark)
 }
 
 function test_rules_file_fallback {
 	Setup
-	$srcFile = P $Repo 'rules' 'adk.md'
+	$srcFile = P $Repo 'rules' 'slipway.md'
 	$src = Get-Text $srcFile
 	Run -NoSymlink
 	Check 'fallback exit 0' ($Rc -eq 0)
-	foreach ($f in (P $H '.claude' 'rules' 'adk.md'), (P $H '.copilot' 'instructions' 'adk.instructions.md')) {
+	foreach ($f in (P $H '.claude' 'rules' 'slipway.md'), (P $H '.copilot' 'instructions' 'slipway.instructions.md')) {
 		$lines = @(Get-Content -LiteralPath $f)
 		Check "real file $f" ((Test-Path -LiteralPath $f -PathType Leaf) -and -not (Is-Link $f))
 		Check "warning line $f" (Has-Line "copied $f (re-run install after updates)")
@@ -283,8 +283,8 @@ function test_rules_file_fallback {
 		Check "marker after frontmatter $f" ($close -gt 0 -and $lines[$close + 1] -eq $Mark)
 		Check "not a hard link $f" ((Get-Text $f) -ne $src)
 	}
-	Check 'skills still linked' (Points-To (P $H '.claude' 'skills' 'adk-a') (P $Repo 'skills' 'adk-a'))
-	$r = P $H '.claude' 'rules' 'adk.md'
+	Check 'skills still linked' (Points-To (P $H '.claude' 'skills' 'slipway-a') (P $Repo 'skills' 'slipway-a'))
+	$r = P $H '.claude' 'rules' 'slipway.md'
 	Set-Text $srcFile ($src + "new rule`n")
 	Run -NoSymlink
 	Check 'fallback re-run exit 0' ($Rc -eq 0)
@@ -293,7 +293,7 @@ function test_rules_file_fallback {
 	Check 'fallback re-run prints no removed line' (@($Out | Where-Object { $_ -like 'removed *' }).Count -eq 0)
 	Run uninstall
 	Check 'fallback uninstall removes claude rule' (-not (Exists $r))
-	Check 'fallback uninstall removes copilot rule' (-not (Exists (P $H '.copilot' 'instructions' 'adk.instructions.md')))
+	Check 'fallback uninstall removes copilot rule' (-not (Exists (P $H '.copilot' 'instructions' 'slipway.instructions.md')))
 	Check 'repo rule intact' ((Get-Text $srcFile) -eq ($src + "new rule`n"))
 }
 
@@ -324,19 +324,19 @@ function test_status_output {
 	Check 'status before install exit 0' ($Rc -eq 0)
 	Check 'status before install prints nothing' ($Out.Count -eq 0)
 	Run
-	[IO.Directory]::Delete((P $H '.agents' 'skills' 'adk-b'))
-	$rule = P $H '.claude' 'rules' 'adk.md'
+	[IO.Directory]::Delete((P $H '.agents' 'skills' 'slipway-b'))
+	$rule = P $H '.claude' 'rules' 'slipway.md'
 	[IO.File]::Delete($rule)
 	Set-Text $rule "mine`n"
 	Run status
 	Check 'status exit 1 on conflict' ($Rc -eq 1)
 	$want = @(
-		('ok ' + (P $H '.claude' 'skills' 'adk-a')),
-		('ok ' + (P $H '.agents' 'skills' 'adk-a')),
-		('ok ' + (P $H '.claude' 'skills' 'adk-b')),
+		('ok ' + (P $H '.claude' 'skills' 'slipway-a')),
+		('ok ' + (P $H '.agents' 'skills' 'slipway-a')),
+		('ok ' + (P $H '.claude' 'skills' 'slipway-b')),
 		"conflict $rule",
-		('ok ' + (P $H '.copilot' 'instructions' 'adk.instructions.md')),
-		('ok ' + (P $H '.copilot' 'hooks' 'adk-guard.json')),
+		('ok ' + (P $H '.copilot' 'instructions' 'slipway.instructions.md')),
+		('ok ' + (P $H '.copilot' 'hooks' 'slipway-guard.json')),
 		('ok ' + (P $H '.claude' 'settings.json')))
 	Check 'status lines only for existing entries' (($Out -join "`n") -eq ($want -join "`n"))
 	Check 'status changes nothing' ((Get-Text $rule) -eq "mine`n")
@@ -347,15 +347,15 @@ function test_zero_skills {
 	[IO.Directory]::Delete((P $Repo 'skills'), $true)
 	Run
 	Check 'zero skills exit 0' ($Rc -eq 0)
-	Check 'zero skills: claude rule' (Points-To (P $H '.claude' 'rules' 'adk.md') (P $Repo 'rules' 'adk.md'))
-	Check 'zero skills: copilot rule' (Points-To (P $H '.copilot' 'instructions' 'adk.instructions.md') (P $Repo 'rules' 'adk.md'))
+	Check 'zero skills: claude rule' (Points-To (P $H '.claude' 'rules' 'slipway.md') (P $Repo 'rules' 'slipway.md'))
+	Check 'zero skills: copilot rule' (Points-To (P $H '.copilot' 'instructions' 'slipway.instructions.md') (P $Repo 'rules' 'slipway.md'))
 	Check 'zero skills: no skill dirs' (-not (Exists (P $H '.claude' 'skills')) -and -not (Exists (P $H '.agents' 'skills')))
 }
 
 function Read-Json([string]$p) { [IO.File]::ReadAllText($p) | ConvertFrom-Json }
 function Canon($o) { ConvertTo-Json -InputObject $o -Depth 20 -Compress }
 function Settings-Path { P $H '.claude' 'settings.json' }
-function Copilot-Path { P $H '.copilot' 'hooks' 'adk-guard.json' }
+function Copilot-Path { P $H '.copilot' 'hooks' 'slipway-guard.json' }
 function Copilot-Hook { @((Read-Json (Copilot-Path)).hooks.preToolUse)[0] }
 # Guard path with forward slashes, quoted, plus the tool flag: the kit's command suffix.
 function Guard-Path { (P $Repo 'hooks' 'guard.py') -replace '\\', '/' }
@@ -398,7 +398,7 @@ function test_hooks_written {
 	$c = $g[0].hooks[0].command
 	$prefix = '[ ! -f "' + (Guard-Path) + '" ] || '
 	Check 'settings kit command' ($c.StartsWith($prefix) -and (Is-KitRun $c.Substring($prefix.Length) 'claude'))
-	Check 'no backup without prior settings' (-not (Exists "$s.adk-backup"))
+	Check 'no backup without prior settings' (-not (Exists "$s.slipway-backup"))
 	Run uninstall
 	Check 'kit-created settings left empty' ((Canon (Read-Json $s)) -eq '{}')
 }
@@ -495,11 +495,11 @@ function test_backup_created {
 	[void](New-Item -ItemType Directory -Force -Path (P $H '.claude'))
 	Set-Text $s "{`"model`": `"opus`"}`n"
 	Run
-	Check 'backup is original' ((Get-Text "$s.adk-backup") -eq "{`"model`": `"opus`"}`n")
+	Check 'backup is original' ((Get-Text "$s.slipway-backup") -eq "{`"model`": `"opus`"}`n")
 	Run uninstall
 	Set-Text $s "{`"model`": `"sonnet`"}`n"
 	Run
-	Check 'backup never overwritten' ((Get-Text "$s.adk-backup") -eq "{`"model`": `"opus`"}`n")
+	Check 'backup never overwritten' ((Get-Text "$s.slipway-backup") -eq "{`"model`": `"opus`"}`n")
 }
 
 function test_uninstall_removes_only_guard_entry {
@@ -530,7 +530,7 @@ function test_invalid_settings_json {
 	Check 'invalid json exit 1' ($Rc -eq 1)
 	Check 'invalid json conflict line' (Has-Line "conflict $s (invalid JSON)")
 	Check 'invalid json untouched' ((Get-Text $s) -eq "{not json`n")
-	Check 'invalid json no backup' (-not (Exists "$s.adk-backup"))
+	Check 'invalid json no backup' (-not (Exists "$s.slipway-backup"))
 	Check 'copilot hook still written' (Exists (Copilot-Path))
 	Check-Links
 }
@@ -578,7 +578,7 @@ function test_unexpected_hooks_structure {
 	Check 'structure exit 1' ($Rc -eq 1)
 	Check 'structure conflict line' (Has-Line "conflict $s (unexpected hooks structure)")
 	Check 'structure untouched' ((Get-Text $s) -eq "{`"hooks`": []}`n")
-	Check 'structure no backup' (-not (Exists "$s.adk-backup"))
+	Check 'structure no backup' (-not (Exists "$s.slipway-backup"))
 }
 
 function test_status_stale_copilot_hook {

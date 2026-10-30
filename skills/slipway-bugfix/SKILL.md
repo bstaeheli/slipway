@@ -1,11 +1,11 @@
 ---
-name: adk-bugfix
+name: slipway-bugfix
 description: Fix a bug test-first with a reproduction test, then ship it. Applies only in projects that have docs/agents/.
 ---
 
-# adk-bugfix
+# slipway-bugfix
 
-Follow `~/.claude/rules/adk.md` by heading. Run on the mid tier; escalate per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
+Follow `~/.claude/rules/slipway.md` by heading. Run on the mid tier; escalate per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
 
 ## Steps
 

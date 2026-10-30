@@ -111,8 +111,8 @@ All three tools support the open Agent Skills format (`SKILL.md` with `name` and
    - Do not also link into `~/.copilot/skills`. VS Code reads all three folders and would see duplicates.
    - Per-skill links leave existing third-party skills in those folders untouched. `~/.agents/skills` already holds 21 other skills.
 2. **Rules.** The repo holds one rules file. It is symlinked to:
-   - `~/.claude/rules/adk.md`
-   - `~/.copilot/instructions/adk.instructions.md`
+   - `~/.claude/rules/slipway.md`
+   - `~/.copilot/instructions/slipway.instructions.md`
 
    The user's existing `~/.claude/CLAUDE.md` is not modified.
 3. **Subagent definitions.** Optional, same symlink approach. Copilot expects the `*.agent.md` naming.
@@ -138,7 +138,7 @@ All three tools support the open Agent Skills format (`SKILL.md` with `name` and
    - **Tests.** The install scripts must be tested on all three operating systems.
    - **CI (our call).** GitHub Actions with an Ubuntu, macOS and Windows matrix. Forgejo Actions reads the same syntax but usually lacks macOS and Windows runners.
    - **Prerequisite.** Python 3 (stdlib only) is required on macOS, Linux and Windows, for the guard hook and the JSON merge. This is a user decision.
-   - **Claude hook registration (our call).** A user-level Claude Code hook can only be registered in `~/.claude/settings.json`. The installer merges one marked guard entry there, writes `settings.json.adk-backup` before its first change, and uninstall removes only that entry. This is the one exception to "touches only the kit's own links".
+   - **Claude hook registration (our call).** A user-level Claude Code hook can only be registered in `~/.claude/settings.json`. The installer merges one marked guard entry there, writes `settings.json.slipway-backup` before its first change, and uninstall removes only that entry. This is the one exception to "touches only the kit's own links".
 7. **Team distribution (later).** The repo also carries a Claude-format plugin marketplace manifest. Claude Code, Copilot CLI and VS Code can all install it. For the user's own machine, symlinks remain preferred because edits take effect immediately.
 
 ### Verify first (unverified, must be tested before relying on them)

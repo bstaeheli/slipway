@@ -5,7 +5,7 @@
 set -eu
 
 REPO=$(cd "$(dirname "$0")" && pwd -P)
-MARK='<!-- adk-installed -->'
+MARK='<!-- slipway-installed -->'
 CMD=install
 COPY=0
 CONFLICT=0
@@ -30,7 +30,7 @@ kit_owned() {
 		case $(readlink "$1") in "$REPO"/*) return 0 ;; esac
 		return 1
 	fi
-	if [ -d "$1" ]; then [ -f "$1/.adk-installed" ]; return; fi
+	if [ -d "$1" ]; then [ -f "$1/.slipway-installed" ]; return; fi
 	[ -f "$1" ] && grep -qxF "$MARK" "$1"
 }
 
@@ -57,7 +57,7 @@ link_entry() {
 		if [ -d "$src" ]; then
 			mkdir "$tgt"
 			cp -R "$src/." "$tgt/"
-			: >"$tgt/.adk-installed"
+			: >"$tgt/.slipway-installed"
 		else
 			# Marker goes after the closing --- of frontmatter, else on line 1.
 			awk -v m="$MARK" '
@@ -99,7 +99,7 @@ status_entry() {
 
 GUARD="$REPO/hooks/guard.py"
 SETTINGS="$HOME/.claude/settings.json"
-COPILOT_HOOK="$HOME/.copilot/hooks/adk-guard.json"
+COPILOT_HOOK="$HOME/.copilot/hooks/slipway-guard.json"
 PY=$(command -v python3 || :)
 
 # hooks <install|uninstall|status>: register, remove or report the guard hooks (hooks/install_hooks.py).
@@ -121,7 +121,7 @@ NL=$(printf '\n_')
 NL=${NL%_}
 IFS=$NL
 SKILL_DIRS="$HOME/.claude/skills$NL$HOME/.agents/skills"
-RULES="$HOME/.claude/rules/adk.md$NL$HOME/.copilot/instructions/adk.instructions.md"
+RULES="$HOME/.claude/rules/slipway.md$NL$HOME/.copilot/instructions/slipway.instructions.md"
 
 case $CMD in
 install)
@@ -133,7 +133,7 @@ install)
 		n=$(basename "$s")
 		for d in $SKILL_DIRS; do link_entry "$REPO/skills/$n" "$d/$n"; done
 	done
-	for r in $RULES; do link_entry "$REPO/rules/adk.md" "$r"; done
+	for r in $RULES; do link_entry "$REPO/rules/slipway.md" "$r"; done
 	hooks install
 	;;
 uninstall)

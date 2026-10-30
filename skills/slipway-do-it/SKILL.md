@@ -1,11 +1,11 @@
 ---
-name: adk-do-it
+name: slipway-do-it
 description: Implement a small, clear change directly with no spec, test it, and ship it. Applies only in projects that have docs/agents/.
 ---
 
-# adk-do-it
+# slipway-do-it
 
-Follow `~/.claude/rules/adk.md` by heading. Run on the mid tier; escalate per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
+Follow `~/.claude/rules/slipway.md` by heading. Run on the mid tier; escalate per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
 
 ## Steps
 

@@ -5,16 +5,16 @@ description: Agent development kit rules. Active only in repos with docs/agents/
 
 ## Opt-in
 
-Active only if the current repo has `docs/agents/`. Otherwise do nothing and ignore this whole file. Exception: the user asks to bootstrap a project (tell the user to type `/adk-bootstrap`).
+Active only if the current repo has `docs/agents/`. Otherwise do nothing and ignore this whole file. Exception: the user asks to bootstrap a project (tell the user to type `/slipway-bootstrap`).
 
 ## Precedence
 
-In projects with `docs/agents/`, `adk-*` skills take precedence over overlapping skills from other plugins (for example Superpowers brainstorming, writing-plans). Kit storage locations under `docs/agents/` win over any other skill's locations.
+In projects with `docs/agents/`, `slipway-*` skills take precedence over overlapping skills from other plugins (for example Superpowers brainstorming, writing-plans). Kit storage locations under `docs/agents/` win over any other skill's locations.
 
 ## Workflow
 
 - Read `docs/agents/constitution/` and `docs/agents/lessons.md` first.
-- Route work via `adk-brainstorm`.
+- Route work via `slipway-brainstorm`.
 - Resume unfinished work from `docs/agents/status.md`.
 - Never read deleted or old specs: code is the truth, git is the history.
 

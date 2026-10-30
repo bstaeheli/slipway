@@ -1,11 +1,11 @@
 ---
-name: adk-spec
-description: Turn a brainstorm result into a spec, design and small runnable slices, then hand off to adk-build. Applies only in projects that have docs/agents/.
+name: slipway-spec
+description: Turn a brainstorm result into a spec, design and small runnable slices, then hand off to slipway-build. Applies only in projects that have docs/agents/.
 ---
 
-# adk-spec
+# slipway-spec
 
-Follow `~/.claude/rules/adk.md` by heading. Run producing and reviewing on the large tier per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
+Follow `~/.claude/rules/slipway.md` by heading. Run producing and reviewing on the large tier per `## Model and context economy`. The user is not present: stop only for blockers per `## Stopping and blockers`.
 
 ## Steps
 
@@ -14,7 +14,7 @@ Follow `~/.claude/rules/adk.md` by heading. Run producing and reviewing on the l
 3. **Design.** Fill `## Design`: `### Context` (relevant knowledge), `### Graph` (affected code structure), `### Acceptance checks` (concrete checks for each acceptance item).
 4. **Plan.** Draft the execution plan in the session. It is transient: the plan is never written to the repo.
 5. **Slicing.** Fill `## Slices` in order with ids `S1`, `S2`, ... Each slice is small, independently runnable and testable. Add one line per slice under `## Active` in `docs/agents/status.md`: `- [ ] <slug>/S<n>: <title>`. Slices that depend on an assumption go under `## Parked` instead (see below).
-6. Hand off to `adk-build`.
+6. Hand off to `slipway-build`.
 
 ## Review loop
 

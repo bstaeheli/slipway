@@ -4,7 +4,7 @@
 
 **Goal:** Build a tool-neutral, spec-driven agent workflow kit (rules, skills, installer, customer-environment guard) that is installed once per machine and serves Claude Code, Copilot in VS Code and Copilot CLI.
 
-**Architecture:** This repo is the single source. Installers link `skills/<name>/` and `rules/adk.md` into user-level tool folders and write two small hook entries that call one guard script. All behavior lives in Markdown (rules and `SKILL.md` files) that every tool reads; the only executable logic is the installers and the guard.
+**Architecture:** This repo is the single source. Installers link `skills/<name>/` and `rules/slipway.md` into user-level tool folders and write two small hook entries that call one guard script. All behavior lives in Markdown (rules and `SKILL.md` files) that every tool reads; the only executable logic is the installers and the guard.
 
 **Tech Stack:** POSIX sh, PowerShell 5.1/7, Python 3.9+ stdlib only (guard, lint, content tests, JSON merge on POSIX), GitHub Actions matrix (ubuntu, macos, windows).
 
@@ -16,7 +16,7 @@
 - Kit is active only in projects that contain `docs/agents/`; elsewhere it does nothing.
 - Never copied into projects; projects receive only outputs under `docs/agents/` plus `AGENTS.md`. No `CLAUDE.md` in projects.
 - Skills: `skills/<name>/SKILL.md`, linked into `~/.claude/skills/<name>` and `~/.agents/skills/<name>`. Never into `~/.copilot/skills`.
-- Rules: `rules/adk.md`, linked to `~/.claude/rules/adk.md` and `~/.copilot/instructions/adk.instructions.md`. Never modify `~/.claude/CLAUDE.md` or other instruction files.
+- Rules: `rules/slipway.md`, linked to `~/.claude/rules/slipway.md` and `~/.copilot/instructions/slipway.instructions.md`. Never modify `~/.claude/CLAUDE.md` or other instruction files.
 - Frontmatter: only `name`, `description`, `disable-model-invocation` in `SKILL.md`. No `!cmd` injection, no `context: fork`.
 - Windows user-level paths: `%USERPROFILE%\.claude`, `%USERPROFILE%\.copilot`, `%USERPROFILE%\.agents`. Directories via junctions; files via symlink when allowed, otherwise a marked copy with a re-run warning (no hard links: git checkout replaces files, so they go stale).
 - Installers are idempotent, touch only kit-owned entries, and report every change.
@@ -27,7 +27,7 @@
 
 ## Review Focus
 
-1. A non-kit file or directory already exists at a link target (for example the user's own `~/.claude/skills/adk-spec`): the installer must skip it, report `conflict`, never overwrite, and exit 1. Test: `test_conflict_not_overwritten` (Tasks 3 and 4).
+1. A non-kit file or directory already exists at a link target (for example the user's own `~/.claude/skills/slipway-spec`): the installer must skip it, report `conflict`, never overwrite, and exit 1. Test: `test_conflict_not_overwritten` (Tasks 3 and 4).
 2. A skill is removed or renamed in the repo, or the user uninstalls: stale kit links are pruned, and the 21 third-party skills in `~/.agents/skills` stay untouched. Tests: `test_prune_stale_link`, `test_uninstall_keeps_foreign` (Tasks 3 and 4).
 3. Paths with spaces (Windows user names, `Application Support`): installers and guard must work. Tests: `test_home_with_spaces` (Tasks 3 and 4), `test_project_path_with_spaces` (Task 5).
 4. Guard receives malformed stdin, or `environments.md` is missing or empty: publish-class commands are denied (fail closed), everything else is allowed. Tests: `test_malformed_input_denies`, `test_missing_environments_denies_publish` (Task 5).
@@ -51,17 +51,17 @@ Out of this plan, separate later plan: Claude-format plugin marketplace for team
 README.md                          install, update, uninstall, opt-in, permissions setup
 install.sh                         POSIX installer (macOS, Linux)
 install.ps1                        Windows installer
-rules/adk.md                       the one rules file
+rules/slipway.md                       the one rules file
 hooks/guard.py                     customer-environment guard (Claude + Copilot hook)
 templates/permissions/claude-settings.json   allowlist template (project or user level)
 templates/permissions/copilot-cli.md         allow-tool flags / config for Copilot CLI
 templates/permissions/vscode-settings.json   auto-approve template for VS Code
-skills/adk-bootstrap/SKILL.md      + templates/ (constitution, AGENTS.md, status, lessons, roadmap, personas)
-skills/adk-brainstorm/SKILL.md     conversation + routing
-skills/adk-do-it/SKILL.md
-skills/adk-bugfix/SKILL.md
-skills/adk-spec/SKILL.md           + templates/spec.md (spec, design, plan, slicing)
-skills/adk-build/SKILL.md          per-slice lanes, cross-review, PR, merge, summary, postmortem
+skills/slipway-bootstrap/SKILL.md      + templates/ (constitution, AGENTS.md, status, lessons, roadmap, personas)
+skills/slipway-brainstorm/SKILL.md     conversation + routing
+skills/slipway-do-it/SKILL.md
+skills/slipway-bugfix/SKILL.md
+skills/slipway-spec/SKILL.md           + templates/spec.md (spec, design, plan, slicing)
+skills/slipway-build/SKILL.md          per-slice lanes, cross-review, PR, merge, summary, postmortem
 docs/platforms.md                  MCP server per git platform, setup per tool
 docs/verification/2026-10-29-tool-behavior.md   Task 1 results
 tests/install_test.sh
@@ -74,7 +74,7 @@ tests/dryrun/sample/               tiny Python project with docs/agents/
 .github/workflows/ci.yml
 ```
 
-Skill count is a builder decision (spec section 11). Our call: six skills with an `adk-` prefix, so they never collide with Superpowers names. Routing lives inside `adk-brainstorm`; design, plan and slicing live inside `adk-spec`; summary and postmortem live inside `adk-build`.
+Skill count is a builder decision (spec section 11). Our call: six skills with an `slipway-` prefix, so they never collide with Superpowers names. Routing lives inside `slipway-brainstorm`; design, plan and slicing live inside `slipway-spec`; summary and postmortem live inside `slipway-build`.
 
 ---
 
@@ -86,7 +86,7 @@ Skill count is a builder decision (spec section 11). Our call: six skills with a
 **Interfaces:**
 - Produces: a results table with IDs V1 to V10, each `yes`/`no`/`partial` plus the consequence. Tasks 3, 4, 6 and 12 read V1 to V10 by ID.
 
-Use a throwaway probe skill `adk-probe` (frontmatter `name: adk-probe`, `description: Reply with the word PROBE-OK when asked to run the probe.`) in a temp dir, linked into the real user folders, and remove every probe link afterwards.
+Use a throwaway probe skill `slipway-probe` (frontmatter `name: slipway-probe`, `description: Reply with the word PROBE-OK when asked to run the probe.`) in a temp dir, linked into the real user folders, and remove every probe link afterwards.
 
 - [ ] **Step 1: Run each check on macOS and record method, result, consequence**
 
@@ -105,7 +105,7 @@ Use a throwaway probe skill `adk-probe` (frontmatter `name: adk-probe`, `descrip
 
 - [ ] **Step 2: Write consequences**
 
-For each `no`, name the fallback: V1/V2/V10 no means copy mode becomes the default (Task 3/4 step "copy mode"); V3 two entries means the README tells VS Code users to disable one location, or the installer drops `~/.claude/skills` linking for VS Code if a setting allows; V5 no means the tier table in `rules/adk.md` says "inherits session model" for that tool; V6/V7 unknown means the Copilot hook stays instruction-only.
+For each `no`, name the fallback: V1/V2/V10 no means copy mode becomes the default (Task 3/4 step "copy mode"); V3 two entries means the README tells VS Code users to disable one location, or the installer drops `~/.claude/skills` linking for VS Code if a setting allows; V5 no means the tier table in `rules/slipway.md` says "inherits session model" for that tool; V6/V7 unknown means the Copilot hook stays instruction-only.
 
 - [ ] **Step 3: Commit**
 
@@ -119,11 +119,11 @@ git commit -m "docs: record verified tool behavior for kit install"
 ### Task 2: Rules file
 
 **Files:**
-- Create: `rules/adk.md`
+- Create: `rules/slipway.md`
 - Create: `tests/test_content.py`
 
 **Interfaces:**
-- Produces: `rules/adk.md` with these exact `##` headings in this order: `Opt-in`, `Precedence`, `Workflow`, `Freedoms`, `Prohibitions`, `Principles`, `Stopping and blockers`, `Permissions and environments`, `Git platforms`, `Model and context economy`. Skills reference these headings by name instead of repeating them.
+- Produces: `rules/slipway.md` with these exact `##` headings in this order: `Opt-in`, `Precedence`, `Workflow`, `Freedoms`, `Prohibitions`, `Principles`, `Stopping and blockers`, `Permissions and environments`, `Git platforms`, `Model and context economy`. Skills reference these headings by name instead of repeating them.
 - Produces: `tests/test_content.py` (unittest) with helper `section(path: str, heading: str) -> str`, reused by Tasks 7 to 10.
 
 - [ ] **Step 1: Write `tests/test_content.py::RulesTest`**
@@ -134,7 +134,7 @@ class RulesTest(unittest.TestCase):
     def test_opt_in_is_first_section(self):       # first ## heading == "Opt-in"; text names docs/agents/ and "do nothing"
     def test_headings_in_order(self):             # exact list above
     def test_prohibitions_complete(self):         # all 9 spec section 9 prohibitions present, incl. "weaken, skip or delete tests", "customer environments" and "package registries"
-    def test_precedence_names_kit_skills(self):   # mentions adk- skills take precedence in projects with docs/agents/
+    def test_precedence_names_kit_skills(self):   # mentions slipway- skills take precedence in projects with docs/agents/
     def test_tiers_defined(self):                 # "large", "mid", "small" and "escalat" present in Model and context economy
     def test_unlisted_target_is_customer(self):   # Permissions section says unlisted target in environments.md is a customer environment
     def test_no_em_dash(self):                    # "\u2014" not in file
@@ -142,12 +142,12 @@ class RulesTest(unittest.TestCase):
 
 - [ ] **Step 2: Run, expect FAIL** `python3 -m unittest tests.test_content -v` (file missing).
 
-- [ ] **Step 3: Write `rules/adk.md`**
+- [ ] **Step 3: Write `rules/slipway.md`**
 
 Frontmatter: `applyTo: "**"` and a `description`. Content per heading, short and imperative:
-- Opt-in: active only if the current repo has `docs/agents/`; otherwise ignore this whole file. Exception: the user asks to bootstrap (then use `adk-bootstrap`).
-- Precedence: in opted-in projects, `adk-*` skills take precedence over overlapping skills from other plugins (for example Superpowers brainstorming, writing-plans). Kit storage locations under `docs/agents/` win over any other skill's locations.
-- Workflow: read `docs/agents/constitution/` and `docs/agents/lessons.md` first; route via `adk-brainstorm`; resume any work from `docs/agents/status.md`; never read deleted or old specs, code is the truth and git is the history.
+- Opt-in: active only if the current repo has `docs/agents/`; otherwise ignore this whole file. Exception: the user asks to bootstrap (then use `slipway-bootstrap`).
+- Precedence: in opted-in projects, `slipway-*` skills take precedence over overlapping skills from other plugins (for example Superpowers brainstorming, writing-plans). Kit storage locations under `docs/agents/` win over any other skill's locations.
+- Workflow: read `docs/agents/constitution/` and `docs/agents/lessons.md` first; route via `slipway-brainstorm`; resume any work from `docs/agents/status.md`; never read deleted or old specs, code is the truth and git is the history.
 - Freedoms, Prohibitions, Principles: spec section 9 verbatim lists.
 - Stopping and blockers: spec section 7 (stop only when blocked and nothing else to do; park; batch blockers in `status.md`; never query password managers or bypass confirmations).
 - Permissions and environments: spec section 8 allowed and forbidden lists; merge override key in `AGENTS.md` is `merge: human`; `environments.md` format pinned in Task 5.
@@ -168,22 +168,22 @@ Frontmatter: `applyTo: "**"` and a `description`. Content per heading, short and
 **Interfaces:**
 - Produces CLI: `sh install.sh [install|uninstall|status] [--copy]`, default `install`. Targets are under `$HOME` (tests set `HOME` to a temp dir).
 - Output: one line per entry, prefix one of `linked`, `ok`, `removed`, `copied`, `conflict`, followed by a space and the target path. Exit 0, or 1 if any `conflict`.
-- Kit-owned means: a symlink whose target resolves inside this repo, or (copy mode) a directory or file containing marker `.adk-installed` / first line `<!-- adk-installed -->`.
+- Kit-owned means: a symlink whose target resolves inside this repo, or (copy mode) a directory or file containing marker `.slipway-installed` / first line `<!-- slipway-installed -->`.
 - Update path: `git pull && sh install.sh` (install prunes stale kit links).
 - Task 6 extends `install`/`uninstall` with hook steps; keep link handling in a function `link_entry <source> <target>` so Task 6 can add calls.
 
 - [ ] **Step 1: Write `tests/install_test.sh`** (plain sh, `assert` helper, each test in a fresh `HOME=$(mktemp -d)`)
 
 Tests and assertions:
-- `test_install_links_all`: every `skills/*/` has links in `$HOME/.claude/skills/<name>` and `$HOME/.agents/skills/<name>` pointing into the repo; `$HOME/.claude/rules/adk.md` and `$HOME/.copilot/instructions/adk.instructions.md` link to `rules/adk.md`; nothing exists under `$HOME/.copilot/skills`.
+- `test_install_links_all`: every `skills/*/` has links in `$HOME/.claude/skills/<name>` and `$HOME/.agents/skills/<name>` pointing into the repo; `$HOME/.claude/rules/slipway.md` and `$HOME/.copilot/instructions/slipway.instructions.md` link to `rules/slipway.md`; nothing exists under `$HOME/.copilot/skills`.
 - `test_idempotent`: second run prints only `ok` lines.
 - `test_creates_missing_dirs`: empty `HOME` works.
-- `test_conflict_not_overwritten`: pre-existing real dir `$HOME/.claude/skills/adk-spec` stays byte-identical; output has `conflict`; exit code 1.
-- `test_prune_stale_link`: a kit link to `skills/adk-gone` (nonexistent) is removed with `removed`.
+- `test_conflict_not_overwritten`: pre-existing real dir `$HOME/.claude/skills/slipway-spec` stays byte-identical; output has `conflict`; exit code 1.
+- `test_prune_stale_link`: a kit link to `skills/slipway-gone` (nonexistent) is removed with `removed`.
 - `test_uninstall_keeps_foreign`: foreign skill dir and foreign symlink in `$HOME/.agents/skills` survive `uninstall`; all kit links gone.
 - `test_home_with_spaces`: `HOME="$tmp/with space"` passes `test_install_links_all` assertions.
 - `test_never_touches_claude_md`: pre-existing `$HOME/.claude/CLAUDE.md` unchanged after install and uninstall.
-- `test_copy_mode`: `--copy` creates real dirs with `.adk-installed`; re-run refreshes them; uninstall removes them.
+- `test_copy_mode`: `--copy` creates real dirs with `.slipway-installed`; re-run refreshes them; uninstall removes them.
 
 - [ ] **Step 2: Run, expect FAIL** `sh tests/install_test.sh`
 
@@ -283,8 +283,8 @@ def test_nested_command_key(self)                        # {"tool_input": {"comm
 
 **Interfaces:**
 - Consumes: `hooks/guard.py` CLI from Task 5; `link_entry` from Tasks 3/4.
-- Installer writes (not links, because it embeds absolute paths) `~/.copilot/hooks/adk-guard.json` that runs `<python> <repo>/hooks/guard.py --tool copilot` on `preToolUse`, in the schema recorded in Task 1 V6. Owned by the kit via key `"adk": true` or a filename check.
-- Installer merges one `PreToolUse` hook entry into `~/.claude/settings.json` (matcher for shell tools, command `<python> <repo>/hooks/guard.py --tool claude`, plus marker field `"adk": true` if Claude tolerates unknown keys, otherwise identify by the command path). Before the first change it writes `settings.json.adk-backup`. Uninstall removes only that entry. POSIX merge via `python3 -c` with stdlib `json`; Windows via `ConvertFrom-Json`/`ConvertTo-Json -Depth 20`.
+- Installer writes (not links, because it embeds absolute paths) `~/.copilot/hooks/slipway-guard.json` that runs `<python> <repo>/hooks/guard.py --tool copilot` on `preToolUse`, in the schema recorded in Task 1 V6. Owned by the kit via key `"slipway": true` or a filename check.
+- Installer merges one `PreToolUse` hook entry into `~/.claude/settings.json` (matcher for shell tools, command `<python> <repo>/hooks/guard.py --tool claude`, plus marker field `"slipway": true` if Claude tolerates unknown keys, otherwise identify by the command path). Before the first change it writes `settings.json.slipway-backup`. Uninstall removes only that entry. POSIX merge via `python3 -c` with stdlib `json`; Windows via `ConvertFrom-Json`/`ConvertTo-Json -Depth 20`.
 - `<python>`: absolute path of `python3` (POSIX) or `py -3`/`python` (Windows), resolved at install time. Missing Python: print `conflict hooks (python 3 not found)` and exit 1; links are still installed.
 - Spec gap noted: spec section 4 says installers touch only the kit's links; editing `~/.claude/settings.json` is the only user-level way to register a Claude hook outside a plugin, and the spec requires the hard block. Our call: merge one marked entry with a backup.
 
@@ -297,41 +297,41 @@ def test_nested_command_key(self)                        # {"tool_input": {"comm
 
 ---
 
-### Task 7: Skill lint and adk-bootstrap
+### Task 7: Skill lint and slipway-bootstrap
 
 **Files:**
-- Create: `tests/lint_skills.py`, `skills/adk-bootstrap/SKILL.md`, `skills/adk-bootstrap/templates/{AGENTS.md,brief.md,tech-stack.md,invariants.md,vocabulary.md,environments.md,status.md,lessons.md,roadmap.md,personas.md}`
+- Create: `tests/lint_skills.py`, `skills/slipway-bootstrap/SKILL.md`, `skills/slipway-bootstrap/templates/{AGENTS.md,brief.md,tech-stack.md,invariants.md,vocabulary.md,environments.md,status.md,lessons.md,roadmap.md,personas.md}`
 - Modify: `tests/test_content.py` (add `BootstrapTest`)
 
 **Interfaces:**
 - Produces: `lint_skills.py` exit 0 when clean, else prints `<path>: <problem>` lines and exits 1. Rules: frontmatter keys subset of `{name, description, disable-model-invocation}`; `name` equals folder name and matches `^[a-z0-9-]{1,64}$`; `description` 1 to 1024 chars; body has no line starting with `` !` `` and no `context:` key; no em dash anywhere under `skills/`.
-- Produces: the template files that `adk-build` and `adk-spec` later write into. `status.md` template has headings `## Active`, `## Done`, `## Parked`, `## Blockers for the user`. `environments.md` template follows the format pinned in Task 5. `AGENTS.md` template points to `docs/agents/`, lists overrides `merge: agent|human`, `git-platform:` and nothing else.
+- Produces: the template files that `slipway-build` and `slipway-spec` later write into. `status.md` template has headings `## Active`, `## Done`, `## Parked`, `## Blockers for the user`. `environments.md` template follows the format pinned in Task 5. `AGENTS.md` template points to `docs/agents/`, lists overrides `merge: agent|human`, `git-platform:` and nothing else.
 
 - [ ] **Step 1: Write lint self-test** `tests/test_lint.py`: fixtures in a temp dir; `test_extra_key_rejected` (`model:`), `test_name_mismatch_rejected`, `test_bang_injection_rejected`, `test_clean_skill_passes`.
-- [ ] **Step 2: Write `BootstrapTest`**: `adk-bootstrap` description mentions bootstrap / opt in; body says it creates `docs/agents/`, drafts the constitution from the existing repo for existing projects, asks the user only to confirm the draft, creates no `CLAUDE.md`, and does not create roadmap or personas by default; all ten templates exist; roadmap and personas templates each start with a one-line "Create when" condition from spec section 5.
+- [ ] **Step 2: Write `BootstrapTest`**: `slipway-bootstrap` description mentions bootstrap / opt in; body says it creates `docs/agents/`, drafts the constitution from the existing repo for existing projects, asks the user only to confirm the draft, creates no `CLAUDE.md`, and does not create roadmap or personas by default; all ten templates exist; roadmap and personas templates each start with a one-line "Create when" condition from spec section 5.
 - [ ] **Step 3: Run, expect FAIL** `python3 -m unittest tests.test_lint tests.test_content -v`
-- [ ] **Step 4: Implement** `lint_skills.py` and `adk-bootstrap` (`disable-model-invocation: true`, so it runs only on request).
+- [ ] **Step 4: Implement** `lint_skills.py` and `slipway-bootstrap` (`disable-model-invocation: true`, so it runs only on request).
 - [ ] **Step 5: Run, expect PASS** plus `python3 tests/lint_skills.py`.
-- [ ] **Step 6: Commit** `git add skills tests && git commit -m "feat: add skill lint and adk-bootstrap"`
+- [ ] **Step 6: Commit** `git add skills tests && git commit -m "feat: add skill lint and slipway-bootstrap"`
 
 ---
 
-### Task 8: adk-brainstorm, adk-do-it, adk-bugfix
+### Task 8: slipway-brainstorm, slipway-do-it, slipway-bugfix
 
 **Files:**
-- Create: `skills/adk-brainstorm/SKILL.md`, `skills/adk-do-it/SKILL.md`, `skills/adk-bugfix/SKILL.md`
+- Create: `skills/slipway-brainstorm/SKILL.md`, `skills/slipway-do-it/SKILL.md`, `skills/slipway-bugfix/SKILL.md`
 - Modify: `tests/test_content.py` (add `FrontEndSkillsTest`)
 
 **Interfaces:**
 - Consumes: rules headings (Task 2), templates (Task 7).
-- Produces: routing outcomes `adk-do-it`, `adk-bugfix`, `adk-spec` named exactly so.
+- Produces: routing outcomes `slipway-do-it`, `slipway-bugfix`, `slipway-spec` named exactly so.
 
 Each skill must contain:
-- adk-brainstorm: read constitution and `lessons.md` first; user describes problem not solution; agent asks one question at a time, challenges assumptions, explores alternatives, surfaces contradictions; record in `docs/agents/brainstorm/<slug>.md` and resume from it; routing criteria from spec section 6 step 2 (spec only when it binds architecture, carries business logic, or spans parts that must ship in order); hand off to the chosen skill.
-- adk-do-it: no spec; implement, run tests from `tech-stack.md`, summarize (what changed, tests run and result, decisions made); PR and merge per rules; mid tier.
-- adk-bugfix: reproduction test first, show it fails, then fix, show it passes; never alter the repro test to pass; summary; PR and merge per rules.
+- slipway-brainstorm: read constitution and `lessons.md` first; user describes problem not solution; agent asks one question at a time, challenges assumptions, explores alternatives, surfaces contradictions; record in `docs/agents/brainstorm/<slug>.md` and resume from it; routing criteria from spec section 6 step 2 (spec only when it binds architecture, carries business logic, or spans parts that must ship in order); hand off to the chosen skill.
+- slipway-do-it: no spec; implement, run tests from `tech-stack.md`, summarize (what changed, tests run and result, decisions made); PR and merge per rules; mid tier.
+- slipway-bugfix: reproduction test first, show it fails, then fix, show it passes; never alter the repro test to pass; summary; PR and merge per rules.
 
-- [ ] **Step 1: Write `FrontEndSkillsTest`** asserting the phrases above (for example `brainstorm/` path, the three routing names, "reproduction test" before "fix" in adk-bugfix, "no spec" in adk-do-it) and that each skill references the rules file by heading instead of restating the prohibitions list.
+- [ ] **Step 1: Write `FrontEndSkillsTest`** asserting the phrases above (for example `brainstorm/` path, the three routing names, "reproduction test" before "fix" in slipway-bugfix, "no spec" in slipway-do-it) and that each skill references the rules file by heading instead of restating the prohibitions list.
 - [ ] **Step 2: Run, expect FAIL**.
 - [ ] **Step 3: Write the three skills.**
 - [ ] **Step 4: Run, expect PASS** plus lint.
@@ -339,14 +339,14 @@ Each skill must contain:
 
 ---
 
-### Task 9: adk-spec
+### Task 9: slipway-spec
 
 **Files:**
-- Create: `skills/adk-spec/SKILL.md`, `skills/adk-spec/templates/spec.md`
+- Create: `skills/slipway-spec/SKILL.md`, `skills/slipway-spec/templates/spec.md`
 - Modify: `tests/test_content.py` (add `SpecSkillTest`)
 
 **Interfaces:**
-- Produces: `docs/agents/specs/<slug>.md` with headings `## Intent`, `## Must`, `## Must not`, `## Acceptance`, `## Design` (subsections `### Context`, `### Graph`, `### Acceptance checks`), `## Slices` (ordered, each with an id `S1`, `S2`, ...). The plan is transient: kept in the session, not written to the repo. `status.md` gets one `## Active` line per slice: `- [ ] <slug>/S<n>: <title>`. `adk-build` consumes exactly these.
+- Produces: `docs/agents/specs/<slug>.md` with headings `## Intent`, `## Must`, `## Must not`, `## Acceptance`, `## Design` (subsections `### Context`, `### Graph`, `### Acceptance checks`), `## Slices` (ordered, each with an id `S1`, `S2`, ...). The plan is transient: kept in the session, not written to the repo. `status.md` gets one `## Active` line per slice: `- [ ] <slug>/S<n>: <title>`. `slipway-build` consumes exactly these.
 
 Skill must contain: spec states intent, must/must-not, acceptance; never layout, wording or how; unsaid means implementer's call; design produces context, graph, acceptance checks; slicing into independently runnable and testable slices; a review loop after each of spec, design, plan, slicing (reviewer flags violations only, never invents obligations, upstream decisions not re-debated); review-loop limit (our call: 3 rounds, then park with a note); a few-line summary to the user instead of the spec; large tier for producing and reviewing.
 
@@ -358,10 +358,10 @@ Skill must contain: spec states intent, must/must-not, acceptance; never layout,
 
 ---
 
-### Task 10: adk-build
+### Task 10: slipway-build
 
 **Files:**
-- Create: `skills/adk-build/SKILL.md`
+- Create: `skills/slipway-build/SKILL.md`
 - Modify: `tests/test_content.py` (add `BuildSkillTest`)
 
 **Interfaces:**
@@ -398,9 +398,9 @@ Skill must contain, in order:
 
 Content:
 - `docs/platforms.md`: one section each for GitHub, Azure DevOps, Forgejo (self-hosted and codeberg.org): which MCP server (verify current names at write time, candidates: `github/github-mcp-server`, `microsoft/azure-devops-mcp`, a Forgejo MCP server), how to register it in Claude Code, Copilot CLI and VS Code, and the token scopes needed for PR create and merge.
-- `README.md`: what the kit is (link to spec), install/update/uninstall on macOS, Linux, Windows, opt-in via `adk-bootstrap`, applying the permission templates, Task 1 caveats (V3 duplicate handling, copy mode), Python 3.9+ needed for the guard.
+- `README.md`: what the kit is (link to spec), install/update/uninstall on macOS, Linux, Windows, opt-in via `slipway-bootstrap`, applying the permission templates, Task 1 caveats (V3 duplicate handling, copy mode), Python 3.9+ needed for the guard.
 
-- [ ] **Step 1: Write `DocsTest`**: `platforms.md` has the three platform headings and mentions all three tools under each; README contains `install.sh`, `install.ps1`, `uninstall`, `git pull`, `adk-bootstrap`, `docs/agents/`.
+- [ ] **Step 1: Write `DocsTest`**: `platforms.md` has the three platform headings and mentions all three tools under each; README contains `install.sh`, `install.ps1`, `uninstall`, `git pull`, `slipway-bootstrap`, `docs/agents/`.
 - [ ] **Step 2: Run, expect FAIL.** **Step 3: Write docs.** **Step 4: Run, expect PASS.**
 - [ ] **Step 5: Commit** `git commit -m "docs: add platform setup and README"`
 
@@ -412,7 +412,7 @@ Content:
 - Create: `tests/dryrun/run.sh`, `tests/dryrun/sample/` (Python package `calc.py` with `add`, `tests/test_calc.py`, `docs/agents/` filled from the templates, `environments.md` listing `localhost`), `tests/dryrun/sample-optout/` (same code, no `docs/agents/`), `tests/dryrun/MANUAL-VSCODE.md`
 
 **Interfaces:**
-- `run.sh claude|copilot` copies the sample to a temp git repo, runs the tool non-interactively (Claude: `claude -p`; Copilot: flags from Task 1 V9) with the prompt "Use adk-do-it: add a function subtract(a, b) to calc.py with tests.", then asserts. Not in CI (costs tokens); run before every release.
+- `run.sh claude|copilot` copies the sample to a temp git repo, runs the tool non-interactively (Claude: `claude -p`; Copilot: flags from Task 1 V9) with the prompt "Use slipway-do-it: add a function subtract(a, b) to calc.py with tests.", then asserts. Not in CI (costs tokens); run before every release.
 
 Assertions:
 - `dry_do_it`: `python3 -m unittest` passes in the temp repo; `subtract` exists; a test for it exists; no `CLAUDE.md` created; no new file outside `calc.py`, `tests/`, `docs/agents/`.

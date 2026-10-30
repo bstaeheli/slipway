@@ -1,6 +1,6 @@
 # Git platform setup
 
-The kit opens and merges PRs through a platform MCP server (see `## Git platforms` in `rules/adk.md`). A missing server is recorded as a blocker. Checked 2026-10-29 against official docs; anything not confirmed is marked **unverified**. Use placeholders below, never commit real tokens: keep them in environment variables or a secrets manager.
+The kit opens and merges PRs through a platform MCP server (see `## Git platforms` in `rules/slipway.md`). A missing server is recorded as a blocker. Checked 2026-10-29 against official docs; anything not confirmed is marked **unverified**. Use placeholders below, never commit real tokens: keep them in environment variables or a secrets manager.
 
 ## GitHub
 

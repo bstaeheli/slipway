@@ -28,7 +28,7 @@ if (-not $UserHome) { $UserHome = $env:USERPROFILE }
 if (-not $UserHome) { $UserHome = $HOME }
 
 $OnWindows = $env:OS -eq 'Windows_NT'
-$Mark = '<!-- adk-installed -->'
+$Mark = '<!-- slipway-installed -->'
 $script:Rc = 0
 
 function P { [IO.Path]::Combine([string[]]$args) }
@@ -55,7 +55,7 @@ function Get-RealPath([string]$p) {
 }
 
 $Repo = Get-RealPath $PSScriptRoot
-$RulesSrc = P $Repo 'rules' 'adk.md'
+$RulesSrc = P $Repo 'rules' 'slipway.md'
 
 # Kit-owned: link into this repo, or a copy carrying the marker (file in a dir, line in a file).
 function Test-KitOwned([string]$p) {
@@ -67,7 +67,7 @@ function Test-KitOwned([string]$p) {
 		if ($OnWindows) { $cmp = [StringComparison]::OrdinalIgnoreCase }
 		return (Get-LinkTarget $i).StartsWith($Repo + $sep, $cmp)
 	}
-	if ($i.PSIsContainer) { return Test-Path -LiteralPath (P $p '.adk-installed') -PathType Leaf }
+	if ($i.PSIsContainer) { return Test-Path -LiteralPath (P $p '.slipway-installed') -PathType Leaf }
 	return @([IO.File]::ReadAllLines($p)) -contains $Mark
 }
 
@@ -117,7 +117,7 @@ function Install-Entry([string]$src, [string]$tgt) {
 	if ($Copy) {
 		if ($isDir) {
 			Copy-Item -LiteralPath $src -Destination $tgt -Recurse -Force
-			[IO.File]::WriteAllText((P $tgt '.adk-installed'), '')
+			[IO.File]::WriteAllText((P $tgt '.slipway-installed'), '')
 		} else {
 			Copy-WithMarker $src $tgt
 		}
@@ -173,7 +173,7 @@ function Find-Python {
 
 $Guard = (P $Repo 'hooks' 'guard.py') -replace '\\', '/'
 $Settings = P $UserHome '.claude' 'settings.json'
-$CopilotHook = P $UserHome '.copilot' 'hooks' 'adk-guard.json'
+$CopilotHook = P $UserHome '.copilot' 'hooks' 'slipway-guard.json'
 
 # Register, remove or report the guard hooks via hooks/install_hooks.py (stdlib json keeps values as written).
 # Python is needed for install, otherwise only when there is a hook file to inspect.
@@ -185,7 +185,7 @@ function Invoke-Hooks([string]$act) {
 }
 
 $SkillDirs = @((P $UserHome '.claude' 'skills'), (P $UserHome '.agents' 'skills'))
-$Rules = @((P $UserHome '.claude' 'rules' 'adk.md'), (P $UserHome '.copilot' 'instructions' 'adk.instructions.md'))
+$Rules = @((P $UserHome '.claude' 'rules' 'slipway.md'), (P $UserHome '.copilot' 'instructions' 'slipway.instructions.md'))
 $Skills = @()
 $SkillsRoot = P $Repo 'skills'
 if (Test-Path -LiteralPath $SkillsRoot -PathType Container) {
