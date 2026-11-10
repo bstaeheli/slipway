@@ -2,7 +2,7 @@
 
 A tool-neutral, spec-driven workflow for coding agents, installed once per machine.
 
-Skills, a rules file and a guard hook that make coding agents (Claude Code, Copilot CLI, VS Code Copilot) work spec-first with contracts, test lanes, review and one PR per slice. Design: [docs/agents/specs/agent-development-kit.md](docs/agents/specs/agent-development-kit.md).
+Skills, a rules file and a guard hook that make coding agents (Claude Code, Copilot CLI, VS Code Copilot) work spec-first with contracts, test lanes, review and one PR per slice. Design: [workflow spec](docs/agents/specs/).
 
 Skills: `slipway-bootstrap` (opt a repo in), `slipway-brainstorm` (front door), `slipway-do-it` (small change), `slipway-bugfix` (test-first fix), `slipway-spec` (spec and slices), `slipway-build` (build slices, PRs, summary).
 
@@ -16,17 +16,17 @@ Skills: `slipway-bootstrap` (opt a repo in), `slipway-brainstorm` (front door), 
 macOS and Linux:
 
 ```sh
-git clone <this repo> && cd agent-development-kit
+git clone <this repo> && cd slipway
 sh install.sh            # also: sh install.sh status | uninstall
 ```
 
 Windows (PowerShell 5.1+):
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\install.ps1            # also: status | uninstall, -Copy
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1  # also: status | uninstall, -Copy
 ```
 
-The default execution policy blocks `.\install.ps1`; `-ExecutionPolicy Bypass` applies to this process only and changes no system setting. With PowerShell 7 use `pwsh -ExecutionPolicy Bypass -File .\install.ps1`.
+The default execution policy blocks `.\install.ps1`; `-ExecutionPolicy Bypass` applies to this process only and changes no system setting. `-NoProfile` skips personal startup scripts so profile errors do not interfere with installation. With PowerShell 7 use `pwsh -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`.
 
 The installer links `skills/*` into `~/.claude/skills` and `~/.agents/skills`, links `rules/slipway.md` to `~/.claude/rules/slipway.md` and `~/.copilot/instructions/slipway.instructions.md`, and registers `hooks/guard.py` as a pre-tool hook in `~/.claude/settings.json` and `~/.copilot/hooks/slipway-guard.json`. It never overwrites foreign files: it prints `conflict <path>` and exits 1. Other output lines are `linked`, `copied`, `ok`, `removed`.
 
@@ -34,7 +34,7 @@ The installer links `skills/*` into `~/.claude/skills` and `~/.agents/skills`, l
 - Link mode is the default. `--copy` (`install.sh`) or `-Copy` (`install.ps1`) copies instead, marked so it can be removed later; re-run the install after updates.
 - Windows: directories are junctions, the rules file is a symbolic link (needs Developer Mode or elevation), else a marked copy, so re-run install after `git pull`. No hard links.
 - Moved the kit or changed Python: re-run install. Deleting the kit: run uninstall first.
-- Update: `git pull`, then re-run the installer. Uninstall: `sh install.sh uninstall` / `powershell -ExecutionPolicy Bypass -File .\install.ps1 uninstall`.
+- Update: `git pull`, then re-run the installer. Uninstall: `sh install.sh uninstall` / `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 uninstall`.
 
 ## Opt in per repo
 

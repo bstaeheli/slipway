@@ -5,7 +5,7 @@ VS Code Copilot Chat has no non-interactive mode, so this is the hand-run counte
 ## Setup
 
 1. Back up `~/.claude`, `~/.copilot` and `~/.agents` first (for example `cp -R ~/.claude ~/.claude.bak`); the next steps touch the real home.
-2. `sh install.sh` (Windows: `powershell -ExecutionPolicy Bypass -File .\install.ps1`). Undo afterwards with `uninstall`.
+2. `sh install.sh` (Windows: `powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1`). Undo afterwards with `uninstall`.
 3. Make two scratch repos: copy `tests/dryrun/sample` and `tests/dryrun/sample-optout` to a temp folder, then `git init && git add -A && git commit -m base` in each.
 4. Open the `sample` copy in VS Code, Copilot Chat in Agent mode.
 
