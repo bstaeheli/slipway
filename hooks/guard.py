@@ -13,15 +13,15 @@ from pathlib import Path
 from typing import List, Optional, Tuple
 
 # Keep state resolution shared with the bootstrap CLI.
-_STATE_MODULE = Path(__file__).resolve().parents[1] / "skills" / "slipway-bootstrap"
-sys.path.insert(0, str(_STATE_MODULE))
 try:
+    _STATE_MODULE = Path(__file__).resolve().parents[1] / "skills" / "slipway-bootstrap"
+    sys.path.insert(0, str(_STATE_MODULE))
     if not (_STATE_MODULE / "state.py").is_file():
         raise ImportError("missing {}".format(_STATE_MODULE / "state.py"))
     import state as slipway_state  # noqa: E402
     from state import StateError, resolve_project_state  # noqa: E402
     _state_import_error = None
-except ImportError as exc:
+except Exception as exc:
     slipway_state = None
     _state_import_error = str(exc)
 

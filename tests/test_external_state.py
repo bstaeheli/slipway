@@ -1,4 +1,5 @@
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -205,6 +206,66 @@ class ExternalStateTest(unittest.TestCase):
             allowed, reason = guard.check("cargo publish", project)
 
         self.assertTrue(allowed, reason)
+
+    def test_docs_file_does_not_opt_in(self):
+        project = self.project()
+        (project / "docs").write_text("ordinary file", encoding="utf-8")
+        with mock.patch.dict(os.environ, self.env):
+            self.assertEqual(guard.check("echo hi", project), (True, "project not opted in"))
+
+    def test_deleted_subdirectory_still_finds_opt_in(self):
+        for mode in ("local", "external"):
+            project = self.project(mode)
+            state = project / "docs" / "agents" if mode == "local" else external_state(self.home, project)
+            state.mkdir(parents=True)
+            deleted = project / "deleted" / "nested"
+            for tool in ("claude", "copilot"):
+                result = subprocess.run(
+                    [sys.executable, str(ROOT / "hooks" / "guard.py"), "--tool", tool],
+                    input=json.dumps({"cwd": str(deleted), "command": "cargo publish"}),
+                    cwd=project, env=self.env, capture_output=True, text=True)
+                if tool == "claude":
+                    self.assertEqual(result.returncode, 2, result.stderr)
+                else:
+                    self.assertEqual(json.loads(result.stdout)["permissionDecision"], "deny")
+
+    def test_init_rejects_missing_project_directory(self):
+        project = self.project()
+        missing = project / "missing"
+        result = subprocess.run(
+            [sys.executable, str(STATE), "init", str(missing)],
+            cwd=project, env=self.env, capture_output=True, text=True)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse(external_state(self.home, project).exists())
+
+    def test_git_marker_inspection_failure_denies(self):
+        project = self.project()
+        external_state(self.home, project).mkdir(parents=True)
+        stdin = mock.Mock()
+        stdin.buffer.read.return_value = json.dumps(
+            {"cwd": str(project), "command": "cargo publish"}).encode()
+        with mock.patch.dict(os.environ, self.env), \
+                mock.patch.object(guard.sys, "stdin", stdin), \
+                mock.patch.object(guard.slipway_state, "_is_git_marker",
+                                  side_effect=OSError("cannot inspect Git marker")):
+            self.assertIn("denying", guard.decide())
+
+    def test_resolver_initialization_errors_emit_copilot_denial(self):
+        project = self.project()
+        isolated = self.root / "isolated"
+        script = isolated / "hooks" / "guard.py"
+        script.parent.mkdir(parents=True)
+        shutil.copyfile(ROOT / "hooks" / "guard.py", script)
+        helper = isolated / "skills" / "slipway-bootstrap" / "state.py"
+        helper.parent.mkdir(parents=True)
+        for content in ("invalid syntax !", "raise OSError('cannot read resolver')"):
+            helper.write_text(content, encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, str(script), "--tool", "copilot"],
+                input=json.dumps({"cwd": str(project), "command": "cargo publish"}),
+                cwd=project, env=self.env, capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(json.loads(result.stdout)["permissionDecision"], "deny")
 
     def test_broken_external_state_denies_even_on_malformed_input(self):
         project = self.project()

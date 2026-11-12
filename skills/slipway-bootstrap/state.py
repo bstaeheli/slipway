@@ -30,7 +30,7 @@ def _home() -> Optional[Path]:
 def _is_directory(path: Path) -> bool:
     try:
         return stat.S_ISDIR(path.stat().st_mode)
-    except FileNotFoundError:
+    except (FileNotFoundError, NotADirectoryError):
         return False
 
 
@@ -60,8 +60,6 @@ def _paths_overlap(left: Path, right: Path) -> bool:
 def _locate(project_directory: Optional[os.PathLike] = None) -> Tuple[Optional[ProjectState], Optional[Path]]:
     try:
         project = Path(project_directory if project_directory is not None else os.getcwd()).expanduser().resolve()
-        if not project.is_dir():
-            raise StateError("project directory does not exist or is not a directory: {}".format(project))
     except StateError:
         raise
     except Exception as exc:
@@ -82,7 +80,7 @@ def _locate(project_directory: Optional[os.PathLike] = None) -> Tuple[Optional[P
         try:
             is_root = _is_git_marker(directory / ".git")
         except OSError as exc:
-            raise StateError("cannot inspect Git metadata in {}: {}".format(directory, exc))
+            raise StateError("cannot inspect Git metadata in {}: {}".format(directory, exc), True)
         if is_root:
             external_dir = _external_dir(directory, home)
             try:
@@ -116,6 +114,9 @@ def resolve_state(project_directory: Optional[os.PathLike] = None) -> Optional[P
 
 def init_state(project_directory: Optional[os.PathLike] = None) -> Path:
     """Create an external state directory without writing into the target repository."""
+    project = Path(project_directory if project_directory is not None else os.getcwd()).expanduser()
+    if not project.is_dir():
+        raise StateError("project directory does not exist or is not a directory: {}".format(project))
     result, git_root = _locate(project_directory)
     if result is not None:
         raise StateError("project is already opted in: {}".format(result[1]), True)
