@@ -1,4 +1,9 @@
 import re
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -18,8 +23,51 @@ class ExternalWorkflowContentTest(unittest.TestCase):
         self.assertIn("`/slipway-bootstrap external`", bootstrap)
         self.assertIn("state.py resolve", bootstrap)
         self.assertIn("state.py init", bootstrap)
-        self.assertIn("state.py resolve", rules)
+        self.assertIn('" resolve`', rules)
         self.assertIn("relative to the resolved state directory", rules)
+        self.assertIn('py -3 "$HOME\\.agents\\skills\\slipway-bootstrap\\state.py" resolve', rules)
+        self.assertIn('python "$HOME\\.agents\\skills\\slipway-bootstrap\\state.py" resolve', rules)
+        self.assertIn('python3 "$HOME/.agents/skills/slipway-bootstrap/state.py" resolve', rules)
+        self.assertIn("replacing `resolve` with `init`", bootstrap)
+
+    @unittest.skipUnless(os.name == "nt" and shutil.which("powershell"), "requires Windows PowerShell")
+    def test_powershell_commands_with_spaces_and_launcher(self):
+        rules = read(Path("rules") / "slipway.md")
+        commands = re.findall(r'`((?:py -3|python|python3) "\$HOME\\[^`]+?" resolve)`', rules)
+        self.assertEqual(len(commands), 3)
+        with tempfile.TemporaryDirectory(prefix="slipway home ") as tmp:
+            home = Path(tmp)
+            script = home / ".agents" / "skills" / "slipway-bootstrap" / "state.py"
+            script.parent.mkdir(parents=True)
+            shutil.copyfile(ROOT / "skills" / "slipway-bootstrap" / "state.py", script)
+            project = home.parent / (home.name + " project")
+            project.mkdir()
+            try:
+                (project / ".git").mkdir()
+                env = {**os.environ, "USERPROFILE": str(home), "HOME": str(home)}
+                for command in commands:
+                    for action in ("resolve", "init"):
+                        if action == "init":
+                            # Each init needs a fresh repository.
+                            run_project = project / command.split()[0]
+                            run_project.mkdir()
+                            (run_project / ".git").mkdir()
+                        else:
+                            run_project = project
+                        prefix = (
+                            "$HOME = $env:USERPROFILE; "
+                            f"function py {{ & '{sys.executable}' @($args | Select-Object -Skip 1) }}; "
+                            f"function python {{ & '{sys.executable}' @args }}; "
+                            f"function python3 {{ & '{sys.executable}' @args }}; "
+                        )
+                        result = subprocess.run(
+                            ["powershell", "-NoProfile", "-Command",
+                             prefix + command.replace("resolve", action) + "; exit $LASTEXITCODE"],
+                            cwd=run_project, env=env, capture_output=True, text=True)
+                        self.assertEqual(result.returncode, 1 if action == "resolve" else 0,
+                                         result.stderr)
+            finally:
+                shutil.rmtree(project)
 
     def test_external_bootstrap_keeps_state_out_of_repo_and_preserves_local_mode(self):
         bootstrap = read(Path("skills") / "slipway-bootstrap" / "SKILL.md")

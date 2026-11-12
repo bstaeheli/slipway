@@ -5,7 +5,12 @@ description: Agent development kit rules. Active in opted-in repositories.
 
 ## Opt-in
 
-Resolve opt-in from the current project directory with `python ~/.agents/skills/slipway-bootstrap/state.py resolve`, using the available Python 3 command (`python3` on systems without `python`). A successful result is the absolute state directory. Exit 1 with no output means not opted in: do nothing and ignore this whole file. Any other error is a blocker; do not assume the project is not opted in. Exception: the user asks to bootstrap a project (tell the user to type `/slipway-bootstrap`).
+Resolve opt-in from the current project directory using a working Python 3 launcher:
+
+- PowerShell: `py -3 "$HOME\.agents\skills\slipway-bootstrap\state.py" resolve`. If `py -3` is unavailable or has no Python 3, use `python "$HOME\.agents\skills\slipway-bootstrap\state.py" resolve` or `python3 "$HOME\.agents\skills\slipway-bootstrap\state.py" resolve` instead.
+- POSIX shell: `python3 "$HOME/.agents/skills/slipway-bootstrap/state.py" resolve`.
+
+Select the launcher by checking its Python version before invoking the resolver, not by retrying resolver errors. A successful result is the absolute state directory. Exit 1 with no output means not opted in: do nothing and ignore this whole file. Any other error is a blocker; do not assume the project is not opted in. Exception: the user asks to bootstrap a project (tell the user to type `/slipway-bootstrap`).
 
 The local state directory is `docs/agents/`. An external opt-in stores state outside the repository. In this file and every `slipway-*` skill, interpret paths starting with `docs/agents/` relative to the resolved state directory instead: replace the `docs/agents/` prefix with that directory. Never create or commit external state inside the repository.
 

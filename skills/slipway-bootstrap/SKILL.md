@@ -10,8 +10,8 @@ Opt this repo into the kit. Follow `~/.claude/rules/slipway.md` (`## Opt-in`, `#
 
 ## Steps
 
-1. Choose external mode only if the user requests it (for example `/slipway-bootstrap external`); otherwise use the existing local mode. If `docs/agents/` exists or `python ~/.agents/skills/slipway-bootstrap/state.py resolve` succeeds, stop and tell the user. Exit 1 without output means not opted in; any other error is a blocker. Never overwrite files.
-2. In external mode, run `python ~/.agents/skills/slipway-bootstrap/state.py init` from the project, and use its output as the state directory. On error stop and report it. In local mode create `docs/agents/` as the state directory. Populate the state directory from the `templates/` next to this file:
+1. Choose external mode only if the user requests it (for example `/slipway-bootstrap external`); otherwise use the existing local mode. If `docs/agents/` exists or the `state.py resolve` command from `## Opt-in` succeeds, stop and tell the user. Exit 1 without output means not opted in; any other error is a blocker. Never overwrite files.
+2. In external mode, use the same launcher and quoted path from `## Opt-in`, replacing `resolve` with `init` to run `state.py init` from the project, and use its output as the state directory. On error stop and report it. In local mode create `docs/agents/` as the state directory. Populate the state directory from the `templates/` next to this file:
    - In local mode, `AGENTS.md` at the repo root (append the kit section if the file exists). In external mode, `AGENTS.md` in the state directory: replace the template's `docs/agents/` references with the absolute state directory; do not create or edit the repo-root file.
    - `constitution/{brief,tech-stack,invariants,vocabulary,environments}.md`
    - `status.md`, `lessons.md`
