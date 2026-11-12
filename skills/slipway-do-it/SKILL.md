@@ -1,6 +1,6 @@
 ---
 name: slipway-do-it
-description: Implement a small, clear change directly with no spec, test it, and ship it. Applies only in projects that have docs/agents/.
+description: Implement a small, clear change directly with no spec, test it, and ship it. Applies to opted-in projects with local docs/agents/ or external state.
 ---
 
 # slipway-do-it

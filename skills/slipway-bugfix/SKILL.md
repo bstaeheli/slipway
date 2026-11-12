@@ -1,6 +1,6 @@
 ---
 name: slipway-bugfix
-description: Fix a bug test-first with a reproduction test, then ship it. Applies only in projects that have docs/agents/.
+description: Fix a bug test-first with a reproduction test, then ship it. Applies to opted-in projects with local docs/agents/ or external state.
 ---
 
 # slipway-bugfix
