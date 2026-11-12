@@ -233,6 +233,8 @@ test_hook_commands_run() {
 	mv "$REPO" "$T/my repo"
 	REPO="$T/my repo"
 	run
+	mkdir -p "$REPO/skills/slipway-bootstrap"
+	cp "$SRC/skills/slipway-bootstrap/state.py" "$REPO/skills/slipway-bootstrap/"
 	proj="$T/proj"
 	mkdir -p "$proj/docs/agents"
 	c=$(jget "$HOME/.claude/settings.json" "d['hooks']['PreToolUse'][0]['hooks'][0]['command']")

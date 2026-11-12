@@ -1,15 +1,22 @@
 ---
 applyTo: "**"
-description: Agent development kit rules. Active only in repos with docs/agents/.
+description: Agent development kit rules. Active in opted-in repositories.
 ---
 
 ## Opt-in
 
-Active only if the current repo has `docs/agents/`. Otherwise do nothing and ignore this whole file. Exception: the user asks to bootstrap a project (tell the user to type `/slipway-bootstrap`).
+Resolve opt-in from the current project directory using a working Python 3 launcher:
+
+- PowerShell: `py -3 "$HOME\.agents\skills\slipway-bootstrap\state.py" resolve`. If `py -3` is unavailable or has no Python 3, use `python "$HOME\.agents\skills\slipway-bootstrap\state.py" resolve` or `python3 "$HOME\.agents\skills\slipway-bootstrap\state.py" resolve` instead.
+- POSIX shell: `python3 "$HOME/.agents/skills/slipway-bootstrap/state.py" resolve`.
+
+Select the launcher by checking its Python version before invoking the resolver, not by retrying resolver errors. A successful result is the absolute state directory. Exit 1 with no output means not opted in: do nothing and ignore this whole file. Any other error is a blocker; do not assume the project is not opted in. Exception: the user asks to bootstrap a project (tell the user to type `/slipway-bootstrap`).
+
+The local state directory is `docs/agents/`. An external opt-in stores state outside the repository. In this file and every `slipway-*` skill, interpret paths starting with `docs/agents/` relative to the resolved state directory instead: replace the `docs/agents/` prefix with that directory. Never create or commit external state inside the repository.
 
 ## Precedence
 
-In projects with `docs/agents/`, `slipway-*` skills take precedence over overlapping skills from other plugins (for example Superpowers brainstorming, writing-plans). Kit storage locations under `docs/agents/` win over any other skill's locations.
+In opted-in projects, `slipway-*` skills take precedence over overlapping skills from other plugins (for example Superpowers brainstorming, writing-plans). Kit storage locations under `docs/agents/` win over any other skill's locations.
 
 ## Workflow
 
@@ -73,6 +80,8 @@ Detect the platform from `git remote get-url origin`:
 - `dev.azure.com` or `visualstudio.com`: Azure DevOps
 - `codeberg.org`: Forgejo
 - any other host: Forgejo only if `AGENTS.md` contains `git-platform: forgejo`; otherwise ask once and record the answer there
+
+For external state, consult the existing repo-root `AGENTS.md` if present and the state directory's `AGENTS.md` for kit overrides; the repo-root file takes precedence. Do not write to the repo-root file for external opt-in.
 
 Open PRs and merge through that platform's MCP server. A missing MCP server is a blocker in `status.md`, not a silent fallback. If the repo has no PR capability at all, merge locally.
 

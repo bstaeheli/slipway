@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """Customer-environment guard: a pre-tool hook for Claude Code and Copilot CLI.
 
-In projects that opted into the kit (a docs/agents/ directory), deny shell commands
-that publish to or delete on targets not listed in
-docs/agents/constitution/environments.md under "## Allowed targets".
+In opted-in projects, deny shell commands that publish to or delete on targets
+not listed in the state directory's constitution/environments.md.
 """
 import argparse
 import json
@@ -12,6 +11,19 @@ import re
 import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
+
+# Keep state resolution shared with the bootstrap CLI.
+try:
+    _STATE_MODULE = Path(__file__).resolve().parents[1] / "skills" / "slipway-bootstrap"
+    sys.path.insert(0, str(_STATE_MODULE))
+    if not (_STATE_MODULE / "state.py").is_file():
+        raise ImportError("missing {}".format(_STATE_MODULE / "state.py"))
+    import state as slipway_state  # noqa: E402
+    from state import StateError, resolve_project_state  # noqa: E402
+    _state_import_error = None
+except Exception as exc:
+    slipway_state = None
+    _state_import_error = str(exc)
 
 # ponytail: pattern match on shell commands only; MCP tool calls, obfuscated commands (variables,
 # base64, eval) and shell aliases or wrapper scripts are not caught, the rules-file prohibition is the
@@ -46,32 +58,25 @@ PUBLISH_OR_REMOTE_DELETE = [
     )
 ]
 
-DENY_REASON = ("target not listed in docs/agents/constitution/environments.md; "
+DENY_REASON = ("target not listed in Slipway state constitution/environments.md; "
                "unlisted targets count as customer environments")
 
 
 def opt_in_root(project_dir: Path) -> Optional[Path]:
-    """Nearest dir from project_dir up to the git root that has docs/agents/.
-
-    The user's home directory and its ancestors never count.
-    """
-    try:
-        home = Path.home().resolve()
-    except Exception:  # unset HOME and no passwd entry: skip the home exclusion
-        home = None
-    for d in [project_dir] + list(project_dir.parents):
-        if home is not None and (d == home or d in home.parents):
-            return None
-        if (d / "docs" / "agents").is_dir():
-            return d
-        if (d / ".git").exists():
-            return None
-    return None
+    """Return the local project root or external state directory when opted in."""
+    result = resolve_project_state(project_dir)
+    if result is None:
+        return None
+    project_root, state_dir, is_external = result
+    return state_dir if is_external else project_root
 
 
 def allowed_targets(root: Path) -> List[str]:
+    state_dir = root
+    if (root / "docs" / "agents").is_dir():
+        state_dir = root / "docs" / "agents"
     try:
-        text = (root / "docs" / "agents" / "constitution" / "environments.md").read_text(encoding="utf-8")
+        text = (state_dir / "constitution" / "environments.md").read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return []
     m = re.search(r"^## Allowed targets[ \t]*\r?$(.*?)(?=^## |\Z)", text, re.M | re.S)
@@ -118,6 +123,8 @@ def find_commands(node) -> List[str]:
 
 def decide() -> Optional[str]:
     """Deny reason, or None to allow."""
+    if _state_import_error is not None:
+        return "guard cannot load state resolver ({}); denying".format(_state_import_error)
     project_dir = None
     try:
         data = json.loads(sys.stdin.buffer.read().decode("utf-8"))
@@ -132,9 +139,14 @@ def decide() -> Optional[str]:
         # Fail closed, but only in opted-in projects: the hook is installed globally.
         # project_dir is the payload cwd when it parsed, else the process cwd. If even that
         # cannot be resolved (deleted cwd), the project cannot be opted in as far as we know: allow.
+        if isinstance(e, StateError) and e.opted_in:
+            return "guard failed while resolving opted-in state ({}); denying".format(e)
         try:
             if opt_in_root((project_dir or Path(os.getcwd())).resolve()) is not None:
                 return "guard failed on hook input ({}); denying".format(e)
+        except StateError as state_error:
+            if state_error.opted_in:
+                return "guard failed while resolving opted-in state ({}); denying".format(state_error)
         except Exception:
             pass
         return None

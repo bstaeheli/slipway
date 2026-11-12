@@ -413,6 +413,8 @@ function test_hook_commands_run {
 	[IO.Directory]::Move($Repo, $moved)
 	$script:Repo = $moved
 	Run
+	[void](New-Item -ItemType Directory -Force -Path (P $Repo 'skills' 'slipway-bootstrap'))
+	Copy-Item -LiteralPath (P $Src 'skills' 'slipway-bootstrap' 'state.py') -Destination (P $Repo 'skills' 'slipway-bootstrap')
 	$proj = P $T 'proj'
 	[void](New-Item -ItemType Directory -Force -Path (P $proj 'docs' 'agents'))
 	$cwd = $proj -replace '\\', '/'
