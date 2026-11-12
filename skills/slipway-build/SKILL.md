@@ -1,6 +1,6 @@
 ---
 name: slipway-build
-description: Build a spec slice by slice after slipway-spec, with contracts, code and test lanes, test runs, cross-review and one PR per slice, then the summary. Applies only in projects that have docs/agents/.
+description: Build a spec slice by slice after slipway-spec, with contracts, code and test lanes, test runs, cross-review and one PR per slice, then the summary. Applies to opted-in projects with local docs/agents/ or external state.
 ---
 
 # slipway-build
@@ -26,7 +26,7 @@ Follow `~/.claude/rules/slipway.md` by heading. The user is not present: stop on
    - If `AGENTS.md` says `merge: human`, leave the PR open, keep the line under `## Active` as `- [ ] <slug>/S<n>: <title> (PR <link>, awaiting human merge)`, and move on. While an earlier slice's PR awaits merge, branch the next slice from that PR's branch (stacked) and say so in its PR description.
 10. **End of a spec.**
     - Summary: write it when no buildable slice of the spec remains under `## Active` (the last slice is opened or parked). Build it from the PR descriptions and status notes, not from memory. The user reads only this: what was built; tests run with results; open or parked slices; PRs awaiting merge; decisions you made; every "assumed" item from the spec; tier escalations. Never claim a test passed that was not run (`## Prohibitions`).
-    - Wrap-up, only when every slice of the spec is merged, possibly on a later run: postmortem, appending lessons to `docs/agents/lessons.md`, then delete the spec file. Git keeps the history.
+    - Wrap-up, only when every slice of the spec is merged, possibly on a later run: postmortem, appending lessons to `docs/agents/lessons.md`, then delete the spec file in local mode. Git keeps the history. In external mode retain the spec: it is not in Git.
 
 ## Tiers
 

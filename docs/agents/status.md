@@ -2,7 +2,7 @@
 
 ## Active
 
-- [ ] repo-external-state/S1: External state resolution and guard.
+- [ ] repo-external-state/S1: External state resolution and guard (PR #1, awaiting merge).
   - Unresolvable home directories deny commands in Git repositories: external
     opt-in cannot be ruled out safely.
 - [ ] repo-external-state/S2: External bootstrap and workflow. Depends on S1.

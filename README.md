@@ -38,11 +38,13 @@ The installer links `skills/*` into `~/.claude/skills` and `~/.agents/skills`, l
 
 ## Opt in per repo
 
-The kit acts only in repos that have `docs/agents/`. To create it (constitution, status, lessons), type `/slipway-bootstrap`; the agent cannot start it by itself. Elsewhere the rules and skills do nothing.
+To create `docs/agents/` in the repo (constitution, status, lessons), type `/slipway-bootstrap`. To keep all Slipway state outside the repo instead, type `/slipway-bootstrap external`. The external mode stores state per local checkout under `~/.slipway/projects/`; it does not add Slipway files or Git configuration to the repo. It is machine-local and is not shared with other contributors or copied automatically if the checkout moves.
+
+The agent cannot bootstrap by itself. In repos without either opt-in the rules and skills do nothing. Normal project changes, including commits and PRs, still affect the repository.
 
 ## Guard
 
-In opted-in repos, `hooks/guard.py` denies shell commands that publish to or delete on customer environments (Business Central publish cmdlets, ssh/scp, mutating curl and web requests) and package registry publishes (cargo, npm, PyPI, NuGet, docker push, gem, AppSource) unless the target is listed under `## Allowed targets` in `docs/agents/constitution/environments.md`. It is a second layer on top of the rules file, not a guarantee: it matches shell commands only, so MCP tool calls and obfuscated commands are not caught.
+In opted-in repos, `hooks/guard.py` denies shell commands that publish to or delete on customer environments (Business Central publish cmdlets, ssh/scp, mutating curl and web requests) and package registry publishes (cargo, npm, PyPI, NuGet, docker push, gem, AppSource) unless the target is listed under `## Allowed targets` in the state directory's `constitution/environments.md`. If the home directory cannot be determined, the guard denies commands in Git repositories because it cannot safely rule out an external opt-in. It is a second layer on top of the rules file, not a guarantee: it matches shell commands only, so MCP tool calls and obfuscated commands are not caught.
 
 ## Permission templates
 

@@ -1,6 +1,6 @@
 ---
 name: slipway-spec
-description: Turn a brainstorm result into a spec, design and small runnable slices, then hand off to slipway-build. Applies only in projects that have docs/agents/.
+description: Turn a brainstorm result into a spec, design and small runnable slices, then hand off to slipway-build. Applies to opted-in projects with local docs/agents/ or external state.
 ---
 
 # slipway-spec

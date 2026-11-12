@@ -1,6 +1,6 @@
 ---
 name: slipway-brainstorm
-description: Front door for new work. Talk through the problem with the user, then route to slipway-do-it, slipway-bugfix or slipway-spec. Applies only in projects that have docs/agents/.
+description: Front door for new work. Talk through the problem with the user, then route to slipway-do-it, slipway-bugfix or slipway-spec. Applies to opted-in projects with local docs/agents/ or external state.
 ---
 
 # slipway-brainstorm
