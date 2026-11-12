@@ -1,6 +1,7 @@
 import json
 import re
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -9,7 +10,7 @@ RULES = ROOT / "rules" / "slipway.md"
 TEMPLATES = ROOT / "templates" / "permissions"
 BOOT = ROOT / "skills" / "slipway-bootstrap"
 sys.path.insert(0, str(ROOT / "hooks"))
-from guard import PUBLISH_OR_REMOTE_DELETE  # noqa: E402
+from guard import PUBLISH_OR_REMOTE_DELETE, allowed_targets  # noqa: E402
 
 
 def section(path: str, heading: str) -> str:
@@ -474,11 +475,16 @@ class DocsTest(unittest.TestCase):
             self.assertNotRegex(t, r"gh[ps]_[A-Za-z0-9]{20,}")
 
     def test_environments_path_matches_guard(self):
-        guard = (ROOT / "hooks" / "guard.py").read_text(encoding="utf-8")
-        m = re.search(r'root / "docs" / "agents" / "constitution" / "(environments\.md)"', guard)
-        self.assertTrue(m)
-        path = "docs/agents/constitution/" + m.group(1)
-        self.assertIn(path, section(str(RULES), "Permissions and environments"))
+        self.assertIn("docs/agents/constitution/environments.md",
+                      section(str(RULES), "Permissions and environments"))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for state in (root / "docs" / "agents", root / "external"):
+                env_file = state / "constitution" / "environments.md"
+                env_file.parent.mkdir(parents=True)
+                env_file.write_text("## Allowed targets\n- `local-target`\n", encoding="utf-8")
+            self.assertEqual(allowed_targets(root), ["local-target"])
+            self.assertEqual(allowed_targets(root / "external"), ["local-target"])
 
 
 if __name__ == "__main__":
